@@ -1,8 +1,4 @@
-<html>
-<head>
-<base href=".">
-<title>Basic Image Generator</title>
-<style>
+<html><head><base href="./"><title>Basic Image Generator</title><style>
   * {
     margin: 0;
     padding: 0;
@@ -112,37 +108,27 @@
   .overlay-canvas {
     display: none !important;
   }
-</style>
-</head>
-<body>
-  <div class="container">
-    <h1>AI Image Generator</h1>
-    <div class="input-group">
-      <input type="text" id="promptInput" placeholder="Enter your image prompt here...">
-      <button onclick="generateImage()">Generate</button>
-      <input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
-      <button onclick="document.getElementById(&apos;imageUpload&apos;).click()">Upload Image</button>
-    </div>
-    <div class="image-container" id="imageContainer">
-      <div id="loadingSpinner" class="loading" style="display: none;"></div>
-      <div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image</div>
-    </div>
-  </div>
+</style></head><body><div class="container"><h1>AI Image Generator</h1><div class="input-group"><input type="text" id="promptInput" placeholder="Enter your image prompt here..."><button onclick="generateImage()">Generate</button><input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)" style="display:none"><button onclick="document.getElementById('imageUpload').click()">Upload Image</button></div><div class="image-container" id="imageContainer"><div id="loadingSpinner" class="loading" style="display: none;"></div><div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image</div></div></div><script>let imageCounter = 0;
 
-  <script>let imageCounter = 0;
 function generateImage() {
   const promptInput = document.getElementById('promptInput');
   const imageContainer = document.getElementById('imageContainer');
   const loadingSpinner = document.getElementById('loadingSpinner');
   const placeholderText = document.getElementById('placeholderText');
+
   if (!promptInput.value.trim()) {
     alert('Please enter a prompt!');
     return;
   }
+
   loadingSpinner.style.display = 'block';
   placeholderText.style.display = 'none';
+
+  // Remove any existing images
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
+
+  // Create new image element
   const generatedImage = document.createElement('img');
   generatedImage.id = `generatedImage_${imageCounter++}`;
   generatedImage.className = 'generated-image';
@@ -151,21 +137,42 @@ function generateImage() {
   generatedImage.src = promptInput.value;
   generatedImage.alt = promptInput.value;
   imageContainer.appendChild(generatedImage);
-  generatedImage.onload = function () {
+
+  generatedImage.onload = function() {
     loadingSpinner.style.display = 'none';
     generatedImage.style.display = 'block';
-  };
-  generatedImage.onerror = function () {
-    loadingSpinner.style.display = 'none';
-    placeholderText.style.display = 'block';
-    placeholderText.textContent = 'Error loading image';
+    placeholderText.style.display = 'none';
   };
 }
-document.getElementById('promptInput').addEventListener('keypress', function (e) {
+
+function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const imageContainer = document.getElementById('imageContainer');
+      const placeholderText = document.getElementById('placeholderText');
+      
+      // Remove any existing images
+      const existingImages = imageContainer.querySelectorAll('img');
+      existingImages.forEach(img => img.remove());
+
+      const uploadedImage = document.createElement('img');
+      uploadedImage.id = `uploadedImage_${imageCounter++}`;
+      uploadedImage.className = 'generated-image';
+      uploadedImage.src = e.target.result;
+      uploadedImage.crossOrigin = 'anonymous';
+      
+      imageContainer.appendChild(uploadedImage);
+      placeholderText.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+document.getElementById('promptInput').addEventListener('keypress', function(e) {
   if (e.key === 'Enter') {
     generateImage();
   }
-});</script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-</body>
-</html>
+});</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body></html>
