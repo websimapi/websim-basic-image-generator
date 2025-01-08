@@ -95,19 +95,6 @@
     max-height: 500px;
     border-radius: 5px;
   }
-
-  .editor-controls,
-  .color-picker,
-  .tolerance-slider,
-  canvas,
-  .brush-size-slider,
-  .opacity-slider,
-  .tool-group,
-  .tool-button,
-  .selection-overlay,
-  .overlay-canvas {
-    display: none !important;
-  }
 </style></head><body><div class="container"><h1>AI Image Generator</h1><div class="input-group"><input type="text" id="promptInput" placeholder="Enter your image prompt here..."><button onclick="generateImage()">Generate</button><input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)" style="display:none"><button onclick="document.getElementById('imageUpload').click()">Upload Image</button></div><div class="image-container" id="imageContainer"><div id="loadingSpinner" class="loading" style="display: none;"></div><div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image</div></div></div><script>let imageCounter = 0;
 
 function generateImage() {
