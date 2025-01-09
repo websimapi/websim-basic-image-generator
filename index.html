@@ -216,23 +216,80 @@
     cursor: crosshair;
   }
 
-  .threshold-control {
+  .fill-image-prompt {
+    width: 100%;
+    margin-top: 1rem;
     display: flex;
-    align-items: center;
     gap: 8px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .fill-image-prompt input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .gallery-item {
     background: rgba(255,255,255,0.1);
-    padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .threshold-control input {
-    width: 150px;
-    min-width: auto;
+  .gallery-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
   }
 
-  .threshold-control span {
-    min-width: 30px;
-    text-align: right;
+  .gallery-item .metadata {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.8);
+  }
+
+  .gallery-item .stats {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .gallery-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .gallery-tab {
+    padding: 0.5rem 1rem;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+  }
+
+  .gallery-tab.active {
+    background: #2196F3;
+  }
+
+  .upload-button {
+    background: #4CAF50;
+    margin-left: auto;
   }
 
   @media (max-width: 600px) {
@@ -283,17 +340,23 @@
     canvas {
       max-height: 400px;
     }
-
-    .threshold-control {
-      width: 100%;
-      justify-content: center;
-    }
   }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>AI Image Generator</h1>
+  <div class="gallery-container">
+    <div class="gallery-tabs">
+      <button class="gallery-tab active" onclick="showGalleryTab(&apos;recent&apos;)">Recent</button>
+      <button class="gallery-tab" onclick="showGalleryTab(&apos;popular&apos;)">Popular</button>
+      <button class="gallery-tab" onclick="showGalleryTab(&apos;my&apos;)">My Images</button>
+      <button class="gallery-tab upload-button" onclick="document.getElementById(&apos;imageUpload&apos;).click()">Upload New</button>
+    </div>
+    <div id="gallery" class="gallery">
+      <!-- Gallery items will be inserted here -->
+    </div>
+  </div>
   <div class="input-group">
     <select id="prefixPrompt">
       <option value>Select Prefix...</option>
@@ -331,17 +394,17 @@
         <button class="tool-button" onclick="setTool(&apos;magicWand&apos;)" id="magicWandTool">Magic Wand</button>
         <button class="tool-button" onclick="setTool(&apos;fillSelection&apos;)" id="fillSelectionTool">Fill Selection</button>
         <button class="tool-button" onclick="setTool(&apos;setAlpha&apos;)" id="setAlphaTool">Set Alpha</button>
+        <button class="tool-button" onclick="setTool(&apos;fillWithImage&apos;)" id="fillWithImageTool">Fill with Generated Image</button>
         <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool">Clear Selection</button>
         <div class="color-display">
           <div class="color-preview" id="colorPreview"></div>
           <input type="color" id="colorPicker" class="color-picker" value="#ffffff">
           <span class="color-value" id="colorValue">#FFFFFF</span>
         </div>
-        <div class="threshold-control">
-          <label for="thresholdSlider">Threshold:</label>
-          <input type="range" id="thresholdSlider" min="1" max="100" value="32">
-          <span id="thresholdValue">32</span>
-        </div>
+      </div>
+      <div class="fill-image-prompt" id="fillImagePrompt" style="display: none;">
+        <input type="text" id="selectionPromptInput" placeholder="Enter prompt for selected region...">
+        <button onclick="generateSelectionFill()">Generate Fill</button>
       </div>
       <button onclick="resetImage()">Reset Image</button>
     </div>
@@ -349,14 +412,72 @@
   <button onclick="saveImage()" class="save-button" id="saveButton" style="display: none;">Save Image</button>
 </div>
 
-<script>let imageCounter = 0;
+<script>const room = new WebsimSocket();
+let galleryImages = [];
+let currentTab = 'recent';
+async function initGallery() {
+  galleryImages = await room.collection('gallery_images').getList();
+  room.collection('gallery_images').subscribe(images => {
+    galleryImages = images;
+    renderGallery();
+  });
+  renderGallery();
+}
+function renderGallery() {
+  const galleryEl = document.getElementById('gallery');
+  let images = [...galleryImages];
+  switch (currentTab) {
+    case 'popular':
+      images.sort((a, b) => (b.views || 0) - (a.views || 0));
+      break;
+    case 'my':
+      images = images.filter(img => img.username === room.party.client.username);
+      break;
+    default:
+      images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+  galleryEl.innerHTML = images.map(img => `
+    <div class="gallery-item">
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div class="metadata">
+        <div>${img.prompt}</div>
+        <div>by ${img.username}</div>
+        <div>${new Date(img.created_at).toLocaleDateString()}</div>
+      </div>
+      <div class="stats">
+        <span>${img.views || 0} views</span>
+        <span>${img.uses || 0} uses</span>
+      </div>
+    </div>
+  `).join('');
+}
+async function showGalleryTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.gallery-tab').forEach(el => {
+    el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
+  });
+  renderGallery();
+}
+async function loadGalleryImage(id) {
+  const image = galleryImages.find(img => img.id === id);
+  if (!image) return;
+  await room.collection('gallery_images').update(id, {
+    views: (image.views || 0) + 1
+  });
+  currentImage = new Image();
+  currentImage.onload = function () {
+    setupImageEditor();
+  };
+  currentImage.src = image.imageUrl;
+}
+let imageCounter = 0;
 let currentImage = null;
 let originalImageData = null;
 let currentSelection = null;
 let isShiftPressed = false;
 let isCtrlPressed = false;
-let lastX = 0;
-let lastY = 0;
+let selectionCanvas = null;
+let selectionCtx = null;
 document.addEventListener('keydown', function (e) {
   if (e.shiftKey) isShiftPressed = true;
   if (e.ctrlKey) isCtrlPressed = true;
@@ -369,12 +490,17 @@ function generateImage() {
   const prefixSelect = document.getElementById('prefixPrompt');
   const promptInput = document.getElementById('promptInput');
   const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+  room.collection('gallery_images').create({
+    prompt: fullPrompt,
+    views: 0,
+    uses: 0
+  });
   const imageContainer = document.getElementById('imageContainer');
   const loadingSpinner = document.getElementById('loadingSpinner');
   const placeholderText = document.getElementById('placeholderText');
   const saveButton = document.getElementById('saveButton');
   const editorControls = document.getElementById('editorControls');
-  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
   if (!promptInput.value.trim()) {
     alert('Please enter a prompt!');
     return;
@@ -406,6 +532,7 @@ function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const editorControls = document.getElementById('editorControls');
+  const fillImagePrompt = document.getElementById('fillImagePrompt');
   canvas.width = currentImage.naturalWidth;
   canvas.height = currentImage.naturalHeight;
   ctx.drawImage(currentImage, 0, 0);
@@ -413,6 +540,7 @@ function setupImageEditor() {
   currentImage.style.display = 'none';
   canvas.style.display = 'block';
   editorControls.style.display = 'flex';
+  fillImagePrompt.style.display = 'none';
   canvas.addEventListener('click', handleCanvasClick);
 }
 function handleCanvasClick(e) {
@@ -424,9 +552,8 @@ function handleCanvasClick(e) {
   if (!isShiftPressed && !isCtrlPressed) {
     currentSelection = null;
   }
-  const tolerance = parseInt(document.getElementById('thresholdSlider').value);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), tolerance);
+  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
   if (isShiftPressed || isCtrlPressed) {
     if (currentSelection) {
       for (let i = 0; i < currentSelection.length; i++) {
@@ -438,8 +565,6 @@ function handleCanvasClick(e) {
   } else {
     currentSelection = newSelection;
   }
-  lastX = x;
-  lastY = y;
   drawSelectionOverlay();
 }
 function magicWandSelect(imageData, startX, startY, tolerance) {
@@ -498,10 +623,17 @@ function drawSelectionOverlay() {
 }
 function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
+  const fillImagePrompt = document.getElementById('fillImagePrompt');
   if (tool === 'fillSelection' && currentSelection) {
+    fillImagePrompt.style.display = 'none';
     fillSelection();
   } else if (tool === 'setAlpha' && currentSelection) {
+    fillImagePrompt.style.display = 'none';
     setSelectionAlpha();
+  } else if (tool === 'fillWithImage' && currentSelection) {
+    fillImagePrompt.style.display = 'flex';
+  } else {
+    fillImagePrompt.style.display = 'none';
   }
   canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
 }
@@ -564,7 +696,14 @@ function handleImageUpload(event) {
   const file = event.target.files[0];
   if (file) {
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
+      const imageUrl = await websim.upload(file);
+      await room.collection('gallery_images').create({
+        imageUrl,
+        prompt: file.name,
+        views: 0,
+        uses: 0
+      });
       const uploadedImage = new Image();
       uploadedImage.onload = function () {
         currentImage = uploadedImage;
@@ -574,6 +713,67 @@ function handleImageUpload(event) {
     };
     reader.readAsDataURL(file);
   }
+}
+function generateSelectionFill() {
+  if (!currentSelection) return;
+  const canvas = document.getElementById('editCanvas');
+  const prompt = document.getElementById('selectionPromptInput').value;
+  if (!prompt.trim()) {
+    alert('Please enter a prompt for the selected region');
+    return;
+  }
+  if (!selectionCanvas) {
+    selectionCanvas = document.createElement('canvas');
+    selectionCtx = selectionCanvas.getContext('2d');
+  }
+  let minX = canvas.width,
+    minY = canvas.height,
+    maxX = 0,
+    maxY = 0;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const pos = y * canvas.width + x;
+      if (currentSelection[pos]) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  const selectionWidth = maxX - minX + 1;
+  const selectionHeight = maxY - minY + 1;
+  const generatedImage = document.createElement('img');
+  generatedImage.crossOrigin = 'anonymous';
+  generatedImage.src = prompt;
+  generatedImage.alt = prompt;
+  generatedImage.onload = function () {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    selectionCanvas.width = selectionWidth;
+    selectionCanvas.height = selectionHeight;
+    selectionCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
+    const scaledImageData = selectionCtx.getImageData(0, 0, selectionWidth, selectionHeight);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const pos = y * canvas.width + x;
+        if (currentSelection[pos]) {
+          const scaledX = x - minX;
+          const scaledY = y - minY;
+          const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
+          const targetPos = pos * 4;
+          pixels[targetPos] = scaledImageData.data[scaledPos];
+          pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
+          pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
+          pixels[targetPos + 3] = scaledImageData.data[scaledPos + 3];
+        }
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    originalImageData = imageData;
+    document.getElementById('fillImagePrompt').style.display = 'none';
+  };
 }
 document.getElementById('promptInput').addEventListener('keypress', function (e) {
   if (e.key === 'Enter') {
@@ -586,16 +786,6 @@ document.getElementById('colorPicker').addEventListener('input', function (e) {
 });
 document.getElementById('colorPreview').style.backgroundColor = document.getElementById('colorPicker').value;
 document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();
-document.getElementById('thresholdSlider').addEventListener('input', function (e) {
-  document.getElementById('thresholdValue').textContent = e.target.value;
-  if (currentSelection) {
-    const canvas = document.getElementById('editCanvas');
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    currentSelection = magicWandSelect(imageData, Math.round(lastX), Math.round(lastY), parseInt(e.target.value));
-    drawSelectionOverlay();
-  }
-});</script>
+window.addEventListener('load', initGallery);</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
