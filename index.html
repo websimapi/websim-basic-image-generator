@@ -19,8 +19,9 @@
 
   .container {
     max-width: 800px;
-    width: 100%;
+    width: 95%;
     text-align: center;
+    padding: 10px;
   }
 
   h1 {
@@ -32,7 +33,7 @@
   .input-group {
     margin-bottom: 2rem;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
@@ -48,11 +49,15 @@
   }
 
   input {
-    width: 50%;
+    width: 100%;
+    min-width: 200px;
+    max-width: 400px;
   }
 
   select {
-    width: auto;
+    width: 100%;
+    min-width: 120px;
+    max-width: 200px;
     cursor: pointer;
   }
 
@@ -62,8 +67,8 @@
   }
 
   button {
-    padding: 1rem 2rem;
-    font-size: 1rem;
+    padding: 0.8rem 1.5rem;
+    font-size: 0.9rem;
     background: #4CAF50;
     border: none;
     border-radius: 5px;
@@ -71,6 +76,7 @@
     cursor: pointer;
     transition: transform 0.2s;
     white-space: nowrap;
+    min-width: 120px;
   }
 
   button:hover {
@@ -147,6 +153,9 @@
     background: rgba(255,255,255,0.1);
     border-radius: 5px;
     margin-left: 10px;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
   }
 
   .color-preview {
@@ -167,12 +176,13 @@
     gap: 0.8rem;
     align-items: center;
     background: rgba(255,255,255,0.05);
-    padding: 10px;
+    padding: 8px;
     border-radius: 8px;
+    flex-wrap: wrap;
   }
 
   .tool-button {
-    padding: 0.8rem 1.2rem;
+    padding: 0.6rem 1rem;
     background: #2196F3;
     border: none;
     border-radius: 5px;
@@ -182,6 +192,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     transition: all 0.2s;
+    font-size: 0.8rem;
   }
 
   .tool-button:hover {
@@ -203,6 +214,56 @@
 
   canvas.magic-wand {
     cursor: crosshair;
+  }
+
+  @media (max-width: 600px) {
+    body {
+      padding: 1rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .input-group {
+      gap: 6px;
+    }
+
+    input, select {
+      padding: 0.8rem;
+      font-size: 0.9rem;
+    }
+
+    .tool-group {
+      gap: 0.5rem;
+    }
+
+    .editor-controls {
+      gap: 0.5rem;
+    }
+
+    .color-picker {
+      width: 40px;
+      height: 40px;
+    }
+
+    .color-preview {
+      width: 20px;
+      height: 20px;
+    }
+
+    .image-container {
+      padding: 0.5rem;
+    }
+
+    .generated-image {
+      max-height: 400px;
+    }
+
+    canvas {
+      max-height: 400px;
+    }
   }
 </style>
 </head>
