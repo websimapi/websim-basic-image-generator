@@ -118,6 +118,32 @@
     margin-top: 1rem;
     background: #2196F3;
   }
+
+  .toolbar {
+    margin: 1rem 0;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .threshold-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+  }
+
+  #selectionCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  .magic-select-btn {
+    background: #9c27b0;
+  }
 </style></head><body><div class="container"><h1>AI Image Generator</h1><div class="input-group">
   <select id="prefixPrompt">
     <option value="">Select Prefix...</option>
@@ -145,12 +171,28 @@
   <button onclick="generateImage()">Generate</button>
   <input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
   <button onclick="document.getElementById('imageUpload').click()">Upload Image</button>
-</div><div class="image-container" id="imageContainer">
+</div>
+
+<div class="toolbar">
+  <button class="magic-select-btn" onclick="toggleMagicSelect()">Magic Select Tool</button>
+  <div class="threshold-control">
+    <label for="threshold">Threshold:</label>
+    <input type="range" id="threshold" min="1" max="100" value="30">
+    <span id="thresholdValue">30</span>
+  </div>
+</div>
+
+<div class="image-container" id="imageContainer">
   <div id="loadingSpinner" class="loading" style="display: none;"></div>
   <div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image</div>
+  <canvas id="selectionCanvas" style="display: none;"></canvas>
 </div>
 <button onclick="saveImage()" class="save-button" id="saveButton" style="display: none;">Save Image</button>
-</div><script>let imageCounter = 0;
+</div><script>
+let imageCounter = 0;
+let magicSelectActive = false;
+let selection = new Set();
+let currentImage = null;
 
 function generateImage() {
   const prefixSelect = document.getElementById('prefixPrompt');
@@ -160,6 +202,7 @@ function generateImage() {
   const loadingSpinner = document.getElementById('loadingSpinner');
   const placeholderText = document.getElementById('placeholderText');
   const saveButton = document.getElementById('saveButton');
+  const selectionCanvas = document.getElementById('selectionCanvas');
 
   const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
 
@@ -171,6 +214,8 @@ function generateImage() {
   loadingSpinner.style.display = 'block';
   placeholderText.style.display = 'none';
   saveButton.style.display = 'none';
+  selectionCanvas.style.display = 'none';
+  selection.clear();
 
   // Remove any existing images
   const existingImages = imageContainer.querySelectorAll('img');
@@ -191,6 +236,8 @@ function generateImage() {
     generatedImage.style.display = 'block';
     placeholderText.style.display = 'none';
     saveButton.style.display = 'block';
+    currentImage = generatedImage;
+    setupSelectionCanvas();
   };
 }
 
@@ -199,6 +246,7 @@ function handleImageUpload(event) {
   if (file) {
     const reader = new FileReader();
     const saveButton = document.getElementById('saveButton');
+    const selectionCanvas = document.getElementById('selectionCanvas');
     
     reader.onload = function(e) {
       const imageContainer = document.getElementById('imageContainer');
@@ -217,33 +265,163 @@ function handleImageUpload(event) {
       imageContainer.appendChild(uploadedImage);
       placeholderText.style.display = 'none';
       saveButton.style.display = 'block';
+      currentImage = uploadedImage;
+      
+      uploadedImage.onload = function() {
+        setupSelectionCanvas();
+      };
     };
     reader.readAsDataURL(file);
   }
 }
 
-function saveImage() {
+function toggleMagicSelect() {
+  magicSelectActive = !magicSelectActive;
+  const btn = document.querySelector('.magic-select-btn');
+  btn.style.background = magicSelectActive ? '#ff4081' : '#9c27b0';
+}
+
+function setupSelectionCanvas() {
+  const canvas = document.getElementById('selectionCanvas');
   const imageContainer = document.getElementById('imageContainer');
-  const img = imageContainer.querySelector('img');
-  
-  if (img) {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    
-    // Create temporary link to download the image
-    const link = document.createElement('a');
-    link.download = 'generated-image.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+  canvas.style.display = 'block';
+  canvas.width = currentImage.width;
+  canvas.height = currentImage.height;
+  canvas.style.position = 'absolute';
+  canvas.style.left = currentImage.offsetLeft + 'px';
+  canvas.style.top = currentImage.offsetTop + 'px';
+
+  canvas.onclick = handleMagicSelect;
+}
+
+function handleMagicSelect(e) {
+  if (!magicSelectActive || !currentImage) return;
+
+  const canvas = document.getElementById('selectionCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = currentImage.width;
+  tempCanvas.height = currentImage.height;
+  const ctx = tempCanvas.getContext('2d');
+  ctx.drawImage(currentImage, 0, 0, tempCanvas.width, tempCanvas.height);
+
+  const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const threshold = document.getElementById('threshold').value;
+  const selectedPixels = magicWand(imageData, x, y, threshold);
+
+  if (e.ctrlKey) {
+    // Add to existing selection
+    selectedPixels.forEach(pixel => selection.add(pixel));
+  } else {
+    // New selection
+    selection = new Set(selectedPixels);
   }
+
+  drawSelection();
+}
+
+function magicWand(imageData, startX, startY, threshold) {
+  const width = imageData.width;
+  const height = imageData.height;
+  const pixels = imageData.data;
+  const startPos = (startY * width + startX) * 4;
+  const startColor = {
+    r: pixels[startPos],
+    g: pixels[startPos + 1],
+    b: pixels[startPos + 2],
+    a: pixels[startPos + 3]
+  };
+
+  const stack = [[startX, startY]];
+  const selectedPixels = new Set();
+  const visited = new Set();
+
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    const pos = (y * width + x) * 4;
+    const key = `${x},${y}`;
+
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const currentColor = {
+      r: pixels[pos],
+      g: pixels[pos + 1],
+      b: pixels[pos + 2],
+      a: pixels[pos + 3]
+    };
+
+    if (colorMatch(startColor, currentColor, threshold)) {
+      selectedPixels.add(key);
+
+      // Check neighboring pixels
+      if (x > 0) stack.push([x - 1, y]);
+      if (x < width - 1) stack.push([x + 1, y]);
+      if (y > 0) stack.push([x, y - 1]);
+      if (y < height - 1) stack.push([x, y + 1]);
+    }
+  }
+
+  return selectedPixels;
+}
+
+function colorMatch(c1, c2, threshold) {
+  const delta = threshold * 2.55; // Convert percentage to 0-255 range
+  return Math.abs(c1.r - c2.r) <= delta &&
+         Math.abs(c1.g - c2.g) <= delta &&
+         Math.abs(c1.b - c2.b) <= delta;
+}
+
+function drawSelection() {
+  const canvas = document.getElementById('selectionCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#00ff00';
+  ctx.lineWidth = 1;
+
+  selection.forEach(key => {
+    const [x, y] = key.split(',').map(Number);
+    ctx.strokeRect(x, y, 1, 1);
+  });
+}
+
+function saveImage() {
+  if (!currentImage) return;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = currentImage.naturalWidth;
+  canvas.height = currentImage.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(currentImage, 0, 0);
+  
+  // Apply selection mask if exists
+  if (selection.size > 0) {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    selection.forEach(key => {
+      const [x, y] = key.split(',').map(Number);
+      const pos = (y * canvas.width + x) * 4;
+      imageData.data[pos + 3] = 0; // Set alpha to 0
+    });
+    ctx.putImageData(imageData, 0, 0);
+  }
+  
+  const link = document.createElement('a');
+  link.download = 'edited-image.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
 }
 
 document.getElementById('promptInput').addEventListener('keypress', function(e) {
   if (e.key === 'Enter') {
     generateImage();
   }
-});</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+});
+
+document.getElementById('threshold').addEventListener('input', function(e) {
+  document.getElementById('thresholdValue').textContent = e.target.value;
+});
+</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
