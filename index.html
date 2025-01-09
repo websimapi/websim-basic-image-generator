@@ -133,26 +133,65 @@
     background: rgba(255,255,255,0.1);
     border: none;
     border-radius: 5px;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    margin: 0 5px;
+    vertical-align: middle;
+  }
+
+  .color-display {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 5px;
+    margin-left: 10px;
+  }
+
+  .color-preview {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    border: 2px solid white;
+    margin-right: 8px;
+  }
+
+  .color-value {
+    color: white;
+    font-family: monospace;
   }
 
   .tool-group {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.8rem;
     align-items: center;
+    background: rgba(255,255,255,0.05);
+    padding: 10px;
+    border-radius: 8px;
   }
 
   .tool-button {
-    padding: 0.5rem 1rem;
+    padding: 0.8rem 1.2rem;
     background: #2196F3;
     border: none;
-    border-radius: 3px;
+    border-radius: 5px;
     color: white;
     cursor: pointer;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+  }
+
+  .tool-button:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
   }
 
   .tool-button.active {
-    background: #1976D2;
-    box-shadow: 0 0 5px rgba(255,255,255,0.3);
+    background: #1565C0;
+    box-shadow: 0 0 10px rgba(25,118,210,0.4);
   }
 
   canvas {
@@ -208,7 +247,11 @@
         <button class="tool-button" onclick="setTool(&apos;fillSelection&apos;)" id="fillSelectionTool">Fill Selection</button>
         <button class="tool-button" onclick="setTool(&apos;setAlpha&apos;)" id="setAlphaTool">Set Alpha</button>
         <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool">Clear Selection</button>
-        <input type="color" id="colorPicker" class="color-picker" value="#ffffff">
+        <div class="color-display">
+          <div class="color-preview" id="colorPreview"></div>
+          <input type="color" id="colorPicker" class="color-picker" value="#ffffff">
+          <span class="color-value" id="colorValue">#FFFFFF</span>
+        </div>
       </div>
       <button onclick="resetImage()">Reset Image</button>
     </div>
@@ -441,6 +484,12 @@ document.getElementById('promptInput').addEventListener('keypress', function (e)
   if (e.key === 'Enter') {
     generateImage();
   }
-});</script>
+});
+document.getElementById('colorPicker').addEventListener('input', function (e) {
+  document.getElementById('colorPreview').style.backgroundColor = e.target.value;
+  document.getElementById('colorValue').textContent = e.target.value.toUpperCase();
+});
+document.getElementById('colorPreview').style.backgroundColor = document.getElementById('colorPicker').value;
+document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
