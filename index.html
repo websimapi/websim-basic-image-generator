@@ -414,7 +414,7 @@
       <button class="gallery-tab active" onclick="showGalleryTab(&apos;recent&apos;)">Recent</button>
       <button class="gallery-tab" onclick="showGalleryTab(&apos;popular&apos;)">Popular</button>
       <button class="gallery-tab" onclick="showGalleryTab(&apos;my&apos;)">My Images</button>
-      <button class="gallery-tab upload-button" onclick="document.getElementById(&apos;imageUpload&apos;).click()">Upload New</button>
+      <button class="gallery-tab upload-button" onclick="document.getElementById(&apos;imageUpload&apos;).click()">Load Image</button>
     </div>
     <div id="gallery" class="gallery">
       <!-- Gallery items will be inserted here -->
@@ -446,7 +446,7 @@
     </select>
     <button onclick="generateImage()">Generate</button>
     <input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
-    <button onclick="document.getElementById(&apos;imageUpload&apos;).click()">Upload Image</button>
+    <button onclick="document.getElementById(&apos;imageUpload&apos;).click()">Load Image</button>
   </div>
   <div class="image-container" id="imageContainer">
     <div id="loadingSpinner" class="loading" style="display: none;"></div>
