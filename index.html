@@ -298,6 +298,63 @@
     margin-left: auto;
   }
 
+  .gallery-item-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .gallery-item-controls button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+
+  .edit-button {
+    background: #2196F3;
+  }
+
+  .delete-button {
+    background: #f44336;
+  }
+
+  .edit-prompt-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1a1a2e;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 1000;
+    display: none;
+    width: 90%;
+    max-width: 500px;
+  }
+
+  .edit-prompt-dialog input {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+
+  .edit-prompt-dialog .button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    z-index: 999;
+  }
+
   @media (max-width: 600px) {
     body {
       padding: 1rem;
@@ -417,11 +474,21 @@
   </div>
   <button onclick="saveImage()" class="save-button" id="saveButton" style="display: none;">Save Image</button>
   <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton" style="display: none;">Add to Gallery</button>
+  <div class="overlay" id="overlay"></div>
+  <div class="edit-prompt-dialog" id="editPromptDialog">
+    <h2>Edit Image Details</h2>
+    <input type="text" id="editPromptInput" placeholder="Enter new prompt...">
+    <div class="button-group">
+      <button onclick="cancelEdit()">Cancel</button>
+      <button onclick="saveEdit()">Save</button>
+    </div>
+  </div>
 </div>
 
 <script>const room = new WebsimSocket();
 let galleryImages = [];
 let currentTab = 'recent';
+let currentEditId = null;
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
@@ -455,6 +522,12 @@ function renderGallery() {
         <span>${img.views || 0} views</span>
         <span>${img.uses || 0} uses</span>
       </div>
+      ${img.username === room.party.client.username ? `
+        <div class="gallery-item-controls">
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+        </div>
+      ` : ''}
     </div>
   `).join('');
 }
@@ -820,6 +893,49 @@ async function addToGallery() {
   });
   alert('Image added to gallery successfully!');
 }
-window.addEventListener('load', initGallery);</script>
+function editImage(id) {
+  const image = galleryImages.find(img => img.id === id);
+  if (!image) return;
+  currentEditId = id;
+  const dialog = document.getElementById('editPromptDialog');
+  const overlay = document.getElementById('overlay');
+  const input = document.getElementById('editPromptInput');
+  input.value = image.prompt;
+  dialog.style.display = 'block';
+  overlay.style.display = 'block';
+}
+async function saveEdit() {
+  if (!currentEditId) return;
+  const input = document.getElementById('editPromptInput');
+  const newPrompt = input.value.trim();
+  if (!newPrompt) {
+    alert('Please enter a prompt');
+    return;
+  }
+  await room.collection('gallery_images').update(currentEditId, {
+    prompt: newPrompt
+  });
+  cancelEdit();
+}
+function cancelEdit() {
+  currentEditId = null;
+  const dialog = document.getElementById('editPromptDialog');
+  const overlay = document.getElementById('overlay');
+  const input = document.getElementById('editPromptInput');
+  input.value = '';
+  dialog.style.display = 'none';
+  overlay.style.display = 'none';
+}
+async function deleteImage(id) {
+  if (!confirm('Are you sure you want to delete this image?')) return;
+  await room.collection('gallery_images').delete(id);
+}
+window.addEventListener('load', initGallery);
+document.getElementById('editPromptInput').addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') {
+    saveEdit();
+  }
+});
+document.getElementById('overlay').addEventListener('click', cancelEdit);</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
