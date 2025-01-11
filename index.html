@@ -491,11 +491,16 @@ function generateImage() {
   const promptInput = document.getElementById('promptInput');
   const suffixSelect = document.getElementById('suffixPrompt');
   const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-  room.collection('gallery_images').create({
-    prompt: fullPrompt,
-    views: 0,
-    uses: 0
-  });
+  const tempImg = new Image();
+  tempImg.onload = async function () {
+    await room.collection('gallery_images').create({
+      prompt: fullPrompt,
+      imageUrl: tempImg.src,
+      views: 0,
+      uses: 0
+    });
+  };
+  tempImg.src = fullPrompt;
   const imageContainer = document.getElementById('imageContainer');
   const loadingSpinner = document.getElementById('loadingSpinner');
   const placeholderText = document.getElementById('placeholderText');
@@ -698,18 +703,22 @@ function handleImageUpload(event) {
     const reader = new FileReader();
     reader.onload = async function (e) {
       const imageUrl = await websim.upload(file);
-      await room.collection('gallery_images').create({
-        imageUrl,
-        prompt: file.name,
-        views: 0,
-        uses: 0
-      });
       const uploadedImage = new Image();
       uploadedImage.onload = function () {
         currentImage = uploadedImage;
         setupImageEditor();
       };
       uploadedImage.src = e.target.result;
+      const tempImg = new Image();
+      tempImg.onload = async function () {
+        await room.collection('gallery_images').create({
+          imageUrl: tempImg.src,
+          prompt: file.name,
+          views: 0,
+          uses: 0
+        });
+      };
+      tempImg.src = imageUrl;
     };
     reader.readAsDataURL(file);
   }
