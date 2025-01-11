@@ -188,17 +188,25 @@
   }
 
   .tool-button {
-    padding: 0.6rem 1rem;
+    padding: 0.6rem;
     background: #2196F3;
     border: none;
     border-radius: 5px;
     color: white;
     cursor: pointer;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     transition: all 0.2s;
-    font-size: 0.8rem;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tool-button svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
   }
 
   .tool-button:hover {
@@ -209,6 +217,33 @@
   .tool-button.active {
     background: #1565C0;
     box-shadow: 0 0 10px rgba(25,118,210,0.4);
+  }
+
+  .tool-button:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    margin-bottom: 5px;
+  }
+
+  .tool-button:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0,0,0,0.8);
+    margin-bottom: -5px;
   }
 
   canvas {
@@ -454,11 +489,36 @@
     <canvas id="editCanvas"></canvas>
     <div class="editor-controls" id="editorControls" style="display: block;">
       <div class="tool-group">
-        <button class="tool-button" onclick="setTool(&apos;magicWand&apos;)" id="magicWandTool">Magic Wand</button>
-        <button class="tool-button" onclick="setTool(&apos;fillSelection&apos;)" id="fillSelectionTool">Fill Selection</button>
-        <button class="tool-button" onclick="setTool(&apos;setAlpha&apos;)" id="setAlphaTool">Set Alpha</button>
-        <button class="tool-button" onclick="setTool(&apos;fillWithImage&apos;)" id="fillWithImageTool">Fill with Generated Image</button>
-        <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool">Clear Selection</button>
+        <button class="tool-button" onclick="setTool(&apos;magicWand&apos;)" id="magicWandTool" data-tooltip="Magic Wand">
+          <svg viewBox="0 0 24 24">
+            <path d="M7,5L3,9L9,15L13,11L7,5M16,12L12,16L14,18L18,14L16,12M12.8,2.6L16,5.8L18.6,3.2L15.4,0L12.8,2.6M21.4,11.6L24,14.2L21.4,16.8L18.8,14.2L21.4,11.6M0,18L3,21L5.6,18.4L2.6,15.4L0,18Z"/>
+          </svg>
+        </button>
+        
+        <button class="tool-button" onclick="setTool(&apos;fillSelection&apos;)" id="fillSelectionTool" data-tooltip="Fill Selection">
+          <svg viewBox="0 0 24 24">
+            <path d="M19,11.5C19,11.5 17,13.67 17,15A2,2 0 0,0 19,17A2,2 0 0,0 21,15C21,13.67 19,11.5 19,11.5M5.21,10L10,5.21L14.79,10M16.56,8.94L7.62,0L6.21,1.41L8.59,3.79L3.44,8.94C2.85,9.5 2.85,10.47 3.44,11.06L8.94,16.56C9.23,16.85 9.62,17 10,17C10.38,17 10.77,16.85 11.06,16.56L16.56,11.06C17.15,10.47 17.15,9.5 16.56,8.94Z"/>
+          </svg>
+        </button>
+
+        <button class="tool-button" onclick="setTool(&apos;setAlpha&apos;)" id="setAlphaTool" data-tooltip="Set Alpha">
+          <svg viewBox="0 0 24 24">
+            <path d="M17.66,8L12,2.35L6.34,8C4.78,9.56 4.78,12.11 6.34,13.66L12,19.31L17.66,13.66C19.22,12.11 19.22,9.56 17.66,8M6,18V15L4,17L2.86,15.86L4.86,13.86L2,11V14L4,16L5.14,17.14L3.14,19.14L6,22V19L4,17"/>
+          </svg>
+        </button>
+
+        <button class="tool-button" onclick="setTool(&apos;fillWithImage&apos;)" id="fillWithImageTool" data-tooltip="Fill with Generated Image">
+          <svg viewBox="0 0 24 24">
+            <path d="M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
+          </svg>
+        </button>
+
+        <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool" data-tooltip="Clear Selection">
+          <svg viewBox="0 0 24 24">
+            <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+          </svg>
+        </button>
+
         <div class="color-display">
           <div class="color-preview" id="colorPreview"></div>
           <input type="color" id="colorPicker" class="color-picker" value="#ffffff">
@@ -735,6 +795,16 @@ function drawSelectionOverlay() {
 function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
+  
+  // Remove active class from all buttons
+  document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
+  
+  // Add active class to selected tool
+  const toolButton = document.getElementById(`${tool}Tool`);
+  if (toolButton) {
+    toolButton.classList.add('active');
+  }
+
   if (tool === 'fillSelection' && currentSelection) {
     fillImagePrompt.style.display = 'none';
     fillSelection();
@@ -962,6 +1032,7 @@ document.getElementById('editPromptInput').addEventListener('keypress', function
     saveEdit();
   }
 });
-document.getElementById('overlay').addEventListener('click', cancelEdit);</script>
+document.getElementById('overlay').addEventListener('click', cancelEdit);
+</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
