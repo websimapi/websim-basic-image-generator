@@ -452,7 +452,7 @@
     <div id="loadingSpinner" class="loading" style="display: none;"></div>
     <div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image</div>
     <canvas id="editCanvas"></canvas>
-    <div class="editor-controls" id="editorControls" style="display: none;">
+    <div class="editor-controls" id="editorControls" style="display: block;">
       <div class="tool-group">
         <button class="tool-button" onclick="setTool(&apos;magicWand&apos;)" id="magicWandTool">Magic Wand</button>
         <button class="tool-button" onclick="setTool(&apos;fillSelection&apos;)" id="fillSelectionTool">Fill Selection</button>
@@ -595,7 +595,6 @@ function generateImage() {
   placeholderText.style.display = 'none';
   saveButton.style.display = 'none';
   addGalleryButton.style.display = 'none';
-  editorControls.style.display = 'none';
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
   const generatedImage = document.createElement('img');
@@ -621,15 +620,23 @@ function setupImageEditor() {
   const ctx = canvas.getContext('2d');
   const editorControls = document.getElementById('editorControls');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
-  canvas.width = currentImage.naturalWidth;
-  canvas.height = currentImage.naturalHeight;
-  ctx.drawImage(currentImage, 0, 0);
-  originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  currentImage.style.display = 'none';
-  canvas.style.display = 'block';
-  editorControls.style.display = 'flex';
+  if (currentImage) {
+    canvas.width = currentImage.naturalWidth;
+    canvas.height = currentImage.naturalHeight;
+    ctx.drawImage(currentImage, 0, 0);
+    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    currentImage.style.display = 'none';
+    canvas.style.display = 'block';
+    editorControls.style.display = 'flex';
+  } else {
+    canvas.style.display = 'none';
+    editorControls.style.display = 'block';
+  }
   fillImagePrompt.style.display = 'none';
-  canvas.addEventListener('click', handleCanvasClick);
+  if (!canvas.hasEventListener) {
+    canvas.addEventListener('click', handleCanvasClick);
+    canvas.hasEventListener = true;
+  }
 }
 function handleCanvasClick(e) {
   const canvas = document.getElementById('editCanvas');
@@ -930,7 +937,10 @@ async function deleteImage(id) {
   if (!confirm('Are you sure you want to delete this image?')) return;
   await room.collection('gallery_images').delete(id);
 }
-window.addEventListener('load', initGallery);
+window.addEventListener('load', () => {
+  initGallery();
+  setupImageEditor();
+});
 document.getElementById('editPromptInput').addEventListener('keypress', function (e) {
   if (e.key === 'Enter') {
     saveEdit();
