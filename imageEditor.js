@@ -6,6 +6,7 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
+let magicWandThreshold = 32; // Default threshold value
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -51,7 +52,7 @@ function handleCanvasClick(e) {
   }
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
+  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), magicWandThreshold);
 
   if (isShiftPressed || isCtrlPressed) {
     if (currentSelection) {
@@ -153,6 +154,7 @@ function drawSelectionOverlay() {
 function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
+  const thresholdControl = document.getElementById('thresholdControl');
   
   document.querySelectorAll('.tool-button').forEach(btn => 
     btn.classList.remove('active')
@@ -161,6 +163,13 @@ function setTool(tool) {
   const toolButton = document.getElementById(`${tool}Tool`);
   if (toolButton) {
     toolButton.classList.add('active');
+  }
+
+  // Show/hide threshold control based on selected tool
+  if (tool === 'magicWand') {
+    thresholdControl.style.display = 'flex';
+  } else {
+    thresholdControl.style.display = 'none';
   }
 
   switch (tool) {
@@ -186,6 +195,38 @@ function setTool(tool) {
   }
   
   canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
+}
+
+function updateThreshold(value) {
+  magicWandThreshold = parseInt(value);
+  document.getElementById('thresholdValue').textContent = value;
+  
+  // If there's an active selection, update it with new threshold
+  if (currentSelection) {
+    const canvas = document.getElementById('editCanvas');
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Find center of current selection
+    let centerX = 0, centerY = 0, count = 0;
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const pos = y * canvas.width + x;
+        if (currentSelection[pos]) {
+          centerX += x;
+          centerY += y;
+          count++;
+        }
+      }
+    }
+    
+    if (count > 0) {
+      centerX = Math.round(centerX / count);
+      centerY = Math.round(centerY / count);
+      currentSelection = magicWandSelect(imageData, centerX, centerY, magicWandThreshold);
+      drawSelectionOverlay();
+    }
+  }
 }
 
 function fillSelection() {

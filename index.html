@@ -522,6 +522,19 @@
           </div>
         </div>
         
+        <div class="threshold-control" id="thresholdControl">
+          <label for="threshold">Color Threshold:</label>
+          <input 
+            type="range" 
+            id="threshold" 
+            min="1" 
+            max="100" 
+            value="32" 
+            oninput="updateThreshold(this.value)"
+          >
+          <span class="threshold-value" id="thresholdValue">32</span>
+        </div>
+
         <div class="fill-image-prompt" id="fillImagePrompt" style="display: none;">
           <input type="text" id="selectionPromptInput" placeholder="Enter prompt for selected region...">
           <button onclick="generateSelectionFill()">Prompt Fill Image</button>
@@ -563,6 +576,7 @@
     let isCtrlPressed = false;
     let selectionCanvas = null;
     let selectionCtx = null;
+    let threshold = 32;
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
@@ -698,7 +712,7 @@
         currentSelection = null;
       }
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
+      const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), threshold);
       if (isShiftPressed || isCtrlPressed) {
         if (currentSelection) {
           for (let i = 0; i < currentSelection.length; i++) {
@@ -792,6 +806,11 @@
         fillImagePrompt.style.display = 'none';
       }
       canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
+    }
+
+    function updateThreshold(value) {
+      threshold = parseInt(value);
+      document.getElementById('thresholdValue').textContent = threshold;
     }
 
     function fillSelection() {
