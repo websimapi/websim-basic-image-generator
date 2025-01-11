@@ -807,22 +807,33 @@ document.getElementById('colorPreview').style.backgroundColor = document.getElem
 document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();
 async function addToGallery() {
   const canvas = document.getElementById('editCanvas');
+  const imageData = canvas.toDataURL('image/png');
+  const file = dataURLtoFile(imageData, 'canvas-image.png');
+  const imageUrl = await websim.upload(file);
   const promptInput = document.getElementById('promptInput');
   const prefixSelect = document.getElementById('prefixPrompt');
   const suffixSelect = document.getElementById('suffixPrompt');
   const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-  const imageUrl = canvas.toDataURL('image/png');
-  const tempImg = new Image();
-  tempImg.onload = async function () {
-    await room.collection('gallery_images').create({
-      prompt: fullPrompt,
-      imageUrl: imageUrl,
-      views: 0,
-      uses: 0
-    });
-    alert('Image added to gallery successfully!');
-  };
-  tempImg.src = imageUrl;
+  await room.collection('gallery_images').create({
+    prompt: fullPrompt,
+    imageUrl: imageUrl,
+    views: 0,
+    uses: 0
+  });
+  alert('Image added to gallery successfully!');
+}
+function dataURLtoFile(dataurl, filename) {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, {
+    type: mime
+  });
 }
 window.addEventListener('load', initGallery);</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
