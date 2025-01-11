@@ -126,6 +126,12 @@
     background: #2196F3;
   }
 
+  .add-gallery-button {
+    margin-top: 1rem;
+    background: #9c27b0;
+    margin-left: 1rem;
+  }
+
   .editor-controls {
     margin-top: 1rem;
     display: flex;
@@ -410,6 +416,7 @@
     </div>
   </div>
   <button onclick="saveImage()" class="save-button" id="saveButton" style="display: none;">Save Image</button>
+  <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton" style="display: none;">Add to Gallery</button>
 </div>
 
 <script>const room = new WebsimSocket();
@@ -506,6 +513,7 @@ function generateImage() {
   const placeholderText = document.getElementById('placeholderText');
   const saveButton = document.getElementById('saveButton');
   const editorControls = document.getElementById('editorControls');
+  const addGalleryButton = document.getElementById('addGalleryButton');
   if (!promptInput.value.trim()) {
     alert('Please enter a prompt!');
     return;
@@ -513,6 +521,7 @@ function generateImage() {
   loadingSpinner.style.display = 'block';
   placeholderText.style.display = 'none';
   saveButton.style.display = 'none';
+  addGalleryButton.style.display = 'none';
   editorControls.style.display = 'none';
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
@@ -529,6 +538,7 @@ function generateImage() {
     generatedImage.style.display = 'block';
     placeholderText.style.display = 'none';
     saveButton.style.display = 'block';
+    addGalleryButton.style.display = 'block';
     currentImage = generatedImage;
     setupImageEditor();
   };
@@ -795,6 +805,25 @@ document.getElementById('colorPicker').addEventListener('input', function (e) {
 });
 document.getElementById('colorPreview').style.backgroundColor = document.getElementById('colorPicker').value;
 document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();
+async function addToGallery() {
+  const canvas = document.getElementById('editCanvas');
+  const promptInput = document.getElementById('promptInput');
+  const prefixSelect = document.getElementById('prefixPrompt');
+  const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+  const imageUrl = canvas.toDataURL('image/png');
+  const tempImg = new Image();
+  tempImg.onload = async function () {
+    await room.collection('gallery_images').create({
+      prompt: fullPrompt,
+      imageUrl: imageUrl,
+      views: 0,
+      uses: 0
+    });
+    alert('Image added to gallery successfully!');
+  };
+  tempImg.src = imageUrl;
+}
 window.addEventListener('load', initGallery);</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
