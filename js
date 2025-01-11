@@ -4,12 +4,17 @@ function generateSelectionFill() {
     return;
   }
   
-  const prompt = document.getElementById('selectionPromptInput').value.trim();
-  if (!prompt) {
+  const prefixSelect = document.getElementById('prefixPrompt');
+  const promptInput = document.getElementById('selectionPromptInput');
+  const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+  
+  if (!promptInput.value.trim()) {
     alert('Please enter a prompt for the selected region');
     return;
   }
 
+  // Show loading state
   const loadingSpinner = document.getElementById('loadingSpinner');
   loadingSpinner.style.display = 'block';
 
@@ -20,13 +25,16 @@ function generateSelectionFill() {
   generatedImage.crossOrigin = 'anonymous';
   generatedImage.style.display = 'none';
   
-  // Set the src and alt to exactly match the prompt text
-  generatedImage.src = prompt;
-  generatedImage.alt = prompt;
+  // Set both src and alt to the full prompt
+  generatedImage.src = fullPrompt;
+  generatedImage.alt = fullPrompt;
+  
+  // Track initial src to detect when generation is complete
+  const initialSrc = generatedImage.src;
 
   // When image loads and src has changed (meaning generation is complete)
   generatedImage.onload = function() {
-    if (generatedImage.src !== prompt) {
+    if (generatedImage.src !== initialSrc) {
       loadingSpinner.style.display = 'none';
       
       const canvas = document.getElementById('editCanvas');
