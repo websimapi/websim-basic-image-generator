@@ -544,11 +544,23 @@ async function loadGalleryImage(id) {
   await room.collection('gallery_images').update(id, {
     views: (image.views || 0) + 1
   });
-  currentImage = new Image();
+  const imageContainer = document.getElementById('imageContainer');
+  const existingImages = imageContainer.querySelectorAll('img');
+  existingImages.forEach(img => img.remove());
+  const generatedImage = document.createElement('img');
+  generatedImage.id = `generatedImage_${imageCounter++}`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
+  generatedImage.src = image.imageUrl;
+  generatedImage.alt = image.prompt;
+  imageContainer.appendChild(generatedImage);
+  currentImage = generatedImage;
+  document.getElementById('saveButton').style.display = 'block';
+  document.getElementById('addGalleryButton').style.display = 'block';
   currentImage.onload = function () {
     setupImageEditor();
   };
-  currentImage.src = image.imageUrl;
 }
 let imageCounter = 0;
 let currentImage = null;
@@ -620,6 +632,10 @@ function setupImageEditor() {
   const ctx = canvas.getContext('2d');
   const editorControls = document.getElementById('editorControls');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
+  const loadingSpinner = document.getElementById('loadingSpinner');
+  const placeholderText = document.getElementById('placeholderText');
+  loadingSpinner.style.display = 'none';
+  placeholderText.style.display = 'none';
   if (currentImage) {
     canvas.width = currentImage.naturalWidth;
     canvas.height = currentImage.naturalHeight;
@@ -630,7 +646,7 @@ function setupImageEditor() {
     editorControls.style.display = 'flex';
   } else {
     canvas.style.display = 'none';
-    editorControls.style.display = 'block';
+    editorControls.style.display = 'flex';
   }
   fillImagePrompt.style.display = 'none';
   if (!canvas.hasEventListener) {
