@@ -80,11 +80,8 @@ function generateSelectionFill() {
       ctx.putImageData(imageData, 0, 0);
       originalImageData = imageData;
       
-      // Update the fill image prompt UI
-      document.getElementById('fillImagePrompt').style.display = 'none';
-      document.getElementById('selectionPromptInput').value = '';
-      
       // Cleanup
+      document.getElementById('fillImagePrompt').style.display = 'none';
       fillImage.remove();
       tempCanvas.remove();
 
