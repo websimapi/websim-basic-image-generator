@@ -854,34 +854,41 @@
       link.click();
     }
 
-    async function addToGallery() {
+    function hasImageBeenModified() {
       const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] !== originalImageData.data[i] || pixels[i + 1] !== originalImageData.data[i + 1] || pixels[i + 2] !== originalImageData.data[i + 2] || pixels[i + 3] !== originalImageData.data[i + 3]) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function addToGallery() {
       const promptInput = document.getElementById('promptInput');
       const prefixSelect = document.getElementById('prefixPrompt');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+      const canvas = document.getElementById('editCanvas');
       
       try {
         let imageUrl;
         
-        // Check if image was modified or loaded from desktop
-        if (currentImage && currentImage.src.startsWith('http') && !hasImageBeenModified()) {
-          // Use existing URL for unmodified images from gallery/generation
-          imageUrl = currentImage.src;
-        } else {
-          // For modified images or desktop uploads, create new blob and upload
-          const blob = await new Promise(resolve => {
-            canvas.toBlob(resolve, 'image/png');
-          });
-          
-          // Create a File object from the blob
+        if (hasImageBeenModified()) {
+          // If image was modified, upload the canvas content
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
           const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-          
-          // Upload the file and get the new URL
           imageUrl = await websim.upload(file);
+        } else {
+          // If image wasn't modified, use the original generated image URL
+          const generatedImage = document.querySelector('.generated-image');
+          imageUrl = generatedImage.src;
         }
         
-        // Add to gallery with appropriate URL
+        // Add to gallery with appropriate URL and modified flag
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           imageUrl: imageUrl,
@@ -896,6 +903,69 @@
         console.error('Error adding to gallery:', error);
         alert('Failed to add image to gallery. Please try again.');
       }
+    }
+
+    function generateImage() {
+      const prefixSelect = document.getElementById('prefixPrompt');
+      const promptInput = document.getElementById('promptInput');
+      const suffixSelect = document.getElementById('suffixPrompt');
+      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+      
+      const imageContainer = document.getElementById('imageContainer');
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const placeholderText = document.getElementById('placeholderText');
+      const saveButton = document.getElementById('saveButton');
+      const editorControls = document.getElementById('editorControls');
+      const addGalleryButton = document.getElementById('addGalleryButton');
+
+      if (!promptInput.value.trim()) {
+        alert('Please enter a prompt!');
+        return;
+      }
+
+      loadingSpinner.style.display = 'block';
+      placeholderText.style.display = 'none';
+      saveButton.style.display = 'none';
+      addGalleryButton.style.display = 'none';
+
+      const existingImages = imageContainer.querySelectorAll('img');
+      existingImages.forEach(img => img.remove());
+
+      const generatedImage = document.createElement('img');
+      generatedImage.id = `generatedImage_${Date.now()}`;
+      generatedImage.className = 'generated-image';
+      generatedImage.style.display = 'none';
+      generatedImage.crossOrigin = 'anonymous';
+      generatedImage.src = fullPrompt;
+      generatedImage.alt = fullPrompt;
+      
+      generatedImage.onload = async function() {
+        loadingSpinner.style.display = 'none';
+        generatedImage.style.display = 'block';
+        placeholderText.style.display = 'none';
+        saveButton.style.display = 'block';
+        addGalleryButton.style.display = 'block';
+        currentImage = generatedImage;
+        
+        // Add to gallery immediately with the direct URL
+        try {
+          await room.collection('gallery_images').create({
+            prompt: fullPrompt,
+            imageUrl: generatedImage.src, // Use direct URL since no modifications
+            views: 0,
+            uses: 0,
+            modified: false // Flag to indicate this was not edited
+          });
+          
+          setupImageEditor();
+          
+        } catch (error) {
+          console.error('Error adding generated image to gallery:', error);
+          alert('Failed to add generated image to gallery. Please try again.');
+        }
+      };
+
+      imageContainer.appendChild(generatedImage);
     }
 
     async function handleImageUpload(event) {
@@ -927,75 +997,6 @@
           alert('Failed to upload image. Please try again.');
         }
       }
-    }
-
-    async function generateImage() {
-      const prefixSelect = document.getElementById('prefixPrompt');
-      const promptInput = document.getElementById('promptInput');
-      const suffixSelect = document.getElementById('suffixPrompt');
-      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-      
-      const imageContainer = document.getElementById('imageContainer');
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      const saveButton = document.getElementById('saveButton');
-      const addGalleryButton = document.getElementById('addGalleryButton');
-
-      if (!promptInput.value.trim()) {
-        alert('Please enter a prompt!');
-        return;
-      }
-
-      loadingSpinner.style.display = 'block';
-      placeholderText.style.display = 'none';
-      saveButton.style.display = 'none';
-      addGalleryButton.style.display = 'none';
-
-      // Clear existing images
-      const existingImages = imageContainer.querySelectorAll('img');
-      existingImages.forEach(img => img.remove());
-
-      const generatedImage = document.createElement('img');
-      generatedImage.id = `generatedImage_${Date.now()}`;
-      generatedImage.className = 'generated-image';
-      generatedImage.style.display = 'none';
-      generatedImage.crossOrigin = 'anonymous';
-      generatedImage.src = fullPrompt;
-      generatedImage.alt = fullPrompt;
-      
-      generatedImage.onload = async function() {
-        loadingSpinner.style.display = 'none';
-        generatedImage.style.display = 'block';
-        placeholderText.style.display = 'none';
-        saveButton.style.display = 'block';
-        addGalleryButton.style.display = 'block';
-        currentImage = generatedImage;
-        
-        try {
-          // Convert image to blob and upload
-          const response = await fetch(generatedImage.src);
-          const blob = await response.blob();
-          const file = new File([blob], 'generated-image.png', { type: 'image/png' });
-          const imageUrl = await websim.upload(file);
-          
-          // Add to gallery with uploaded URL
-          await room.collection('gallery_images').create({
-            prompt: fullPrompt,
-            imageUrl: imageUrl,
-            views: 0,
-            uses: 0,
-            modified: false // Flag to indicate this was not edited
-          });
-          
-          setupImageEditor();
-          
-        } catch (error) {
-          console.error('Error processing generated image:', error);
-          alert('Failed to process generated image. Please try again.');
-        }
-      };
-
-      imageContainer.appendChild(generatedImage);
     }
 
     function generateSelectionFill() {
