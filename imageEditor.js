@@ -7,10 +7,6 @@ let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
 
-let animationFrames = [];
-let animationInterval;
-let isAnimating = false;
-
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
@@ -67,13 +63,6 @@ function handleCanvasClick(e) {
     }
   } else {
     currentSelection = newSelection;
-  }
-
-  if (document.getElementById('animateTool').classList.contains('active')) {
-    const frame = captureSelectionFrame();
-    if (frame) {
-      animationFrames.push(frame);
-    }
   }
 
   drawSelectionOverlay();
@@ -192,17 +181,8 @@ function setTool(tool) {
         fillImagePrompt.style.display = 'flex';
       }
       break;
-    case 'animate':
-      document.getElementById('animationControls').style.display = 'block';
-      if (currentSelection) {
-        // Store current selection as first frame
-        const frame = captureSelectionFrame();
-        animationFrames = [frame];
-      }
-      break;
     default:
       fillImagePrompt.style.display = 'none';
-      document.getElementById('animationControls').style.display = 'none';
   }
   
   canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
@@ -265,129 +245,4 @@ function resetImage() {
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
-}
-
-function captureSelectionFrame() {
-  if (!currentSelection) return null;
-  
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  
-  // Find selection bounds
-  let bounds = getSelectionBounds();
-  
-  // Create frame canvas
-  const frameCanvas = document.createElement('canvas');
-  frameCanvas.width = bounds.width;
-  frameCanvas.height = bounds.height;
-  const frameCtx = frameCanvas.getContext('2d');
-  
-  // Copy selection to frame
-  const frameImageData = frameCtx.createImageData(bounds.width, bounds.height);
-  for (let y = bounds.minY; y <= bounds.maxY; y++) {
-    for (let x = bounds.minX; x <= bounds.maxX; x++) {
-      const srcPos = (y * canvas.width + x) * 4;
-      const destPos = ((y - bounds.minY) * bounds.width + (x - bounds.minX)) * 4;
-      if (currentSelection[y * canvas.width + x]) {
-        frameImageData.data[destPos] = imageData.data[srcPos];
-        frameImageData.data[destPos + 1] = imageData.data[srcPos + 1];
-        frameImageData.data[destPos + 2] = imageData.data[srcPos + 2];
-        frameImageData.data[destPos + 3] = imageData.data[srcPos + 3];
-      }
-    }
-  }
-  
-  frameCtx.putImageData(frameImageData, 0, 0);
-  return frameCanvas;
-}
-
-function getSelectionBounds() {
-  const canvas = document.getElementById('editCanvas');
-  let minX = canvas.width;
-  let minY = canvas.height;
-  let maxX = 0;
-  let maxY = 0;
-
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const pos = y * canvas.width + x;
-      if (currentSelection[pos]) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  }
-
-  return {
-    minX,
-    minY,
-    maxX,
-    maxY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1
-  };
-}
-
-function previewAnimation() {
-  if (animationFrames.length < 2) {
-    alert('Please create at least two frames by modifying the selection');
-    return;
-  }
-
-  if (isAnimating) {
-    clearInterval(animationInterval);
-    isAnimating = false;
-    return;
-  }
-
-  let frameIndex = 0;
-  const speed = parseFloat(document.getElementById('speedSlider').value);
-  
-  isAnimating = true;
-  animationInterval = setInterval(() => {
-    const canvas = document.getElementById('editCanvas');
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(originalImageData, 0, 0);
-    
-    const frame = animationFrames[frameIndex];
-    const bounds = getSelectionBounds();
-    ctx.drawImage(frame, bounds.minX, bounds.minY);
-    
-    frameIndex = (frameIndex + 1) % animationFrames.length;
-  }, speed);
-}
-
-function exportGif() {
-  if (animationFrames.length < 2) {
-    alert('Please create at least two frames before exporting');
-    return;
-  }
-
-  const bounds = getSelectionBounds();
-  const frameDelay = parseInt(document.getElementById('speedSlider').value);
-  
-  const gif = new GIF({
-    workers: 2,
-    quality: 10,
-    width: bounds.width,
-    height: bounds.height
-  });
-
-  animationFrames.forEach(frame => {
-    gif.addFrame(frame, { delay: frameDelay });
-  });
-
-  gif.on('finished', blob => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'animation.gif';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
-
-  gif.render();
 }

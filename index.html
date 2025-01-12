@@ -540,12 +540,6 @@
               </svg>
             </button>
 
-            <button class="tool-button" onclick="setTool('animate')" id="animateTool" data-tooltip="Animate Selection">
-              <svg viewBox="0 0 24 24">
-                <path d="M4,2C2.89,2 2,2.89 2,4V14H4V4H14V2H4M8,6C6.89,6 6,6.89 6,8V18H8V8H18V6H8M12,10C10.89,10 10,10.89 10,12V20C10,21.11 10.89,22 12,22H20C21.11,22 22,21.11 22,20V12C22,10.89 21.11,10 20,10H12Z"/>
-              </svg>
-            </button>
-
             <div class="color-display">
               <div class="color-preview" id="colorPreview"></div>
               <input type="color" id="colorPicker" class="color-picker" value="#ffffff">
@@ -556,16 +550,6 @@
           <div class="fill-image-prompt" id="fillImagePrompt" style="display: none;">
             <input type="text" id="selectionPromptInput" placeholder="Enter prompt for selected region...">
             <button onclick="generateSelectionFill()">Prompt Fill Image</button>
-          </div>
-          
-          <div class="animation-controls" id="animationControls" style="display: none;">
-            <div class="speed-control">
-              <label for="speedSlider">Animation Speed:</label>
-              <input type="range" id="speedSlider" min="16.67" max="10000" step="16.67" value="1000">
-              <div id="speedValue" class="speed-value">Animation Speed: 1.00 frames per second</div>
-            </div>
-            <button onclick="previewAnimation()">Preview Animation</button>
-            <button onclick="exportGif()">Export as GIF</button>
           </div>
           
           <button onclick="resetImage()">Reset Image</button>
@@ -601,7 +585,6 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
   <script>
     let room;
     let galleryImages = [];
@@ -841,7 +824,6 @@
     function setTool(tool) {
       const canvas = document.getElementById('editCanvas');
       const fillImagePrompt = document.getElementById('fillImagePrompt');
-      const animationControls = document.getElementById('animationControls');
       
       document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
       
@@ -852,21 +834,14 @@
 
       if (tool === 'fillSelection' && currentSelection) {
         fillImagePrompt.style.display = 'none';
-        animationControls.style.display = 'none';
         fillSelection();
       } else if (tool === 'setAlpha' && currentSelection) {
         fillImagePrompt.style.display = 'none';
-        animationControls.style.display = 'none';
         setSelectionAlpha();
       } else if (tool === 'fillWithImage' && currentSelection) {
         fillImagePrompt.style.display = 'flex';
-        animationControls.style.display = 'none';
-      } else if (tool === 'animate' && currentSelection) {
-        fillImagePrompt.style.display = 'none';
-        animationControls.style.display = 'flex';
       } else {
         fillImagePrompt.style.display = 'none';
-        animationControls.style.display = 'none';
       }
       canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
     }
@@ -1173,14 +1148,6 @@
 
       // Add image to document (hidden) to begin generation
       document.body.appendChild(generatedImage);
-    }
-
-    function previewAnimation() {
-      // To be implemented
-    }
-
-    function exportGif() {
-      // To be implemented
     }
 
     document.addEventListener('keydown', function (e) {
