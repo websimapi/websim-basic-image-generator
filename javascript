@@ -104,7 +104,6 @@ function renderGallery() {
       ` : ''}
     </div>
   `).join('');
-
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
