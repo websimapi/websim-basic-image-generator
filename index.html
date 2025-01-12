@@ -860,56 +860,29 @@
       const prefixSelect = document.getElementById('prefixPrompt');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-  
+      
       try {
-        const ctx = canvas.getContext('2d');
-        const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const currentHash = generateImageHash(currentImageData);
-        
-        const duplicates = await Promise.all(galleryImages.map(async img => {
-          const tempImg = new Image();
-          tempImg.src = img.imageUrl;
-          
-          return new Promise((resolve) => {
-            tempImg.onload = () => {
-              const tempCanvas = document.createElement('canvas');
-              const tempCtx = tempCanvas.getContext('2d');
-              tempCanvas.width = tempImg.width;
-              tempCanvas.height = tempImg.height;
-              tempCtx.drawImage(tempImg, 0, 0);
-              const tempImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-              const tempHash = generateImageHash(tempImageData);
-              resolve(tempHash === currentHash);
-            };
-          });
-        }));
-        
-        const duplicateImages = galleryImages.filter((img, index) => duplicates[index]);
-        
-        for (const duplicate of duplicateImages) {
-          await room.collection('gallery_images').delete(duplicate.id);
-        }
-        
         let imageUrl;
         
-        if (hasImageBeenModified() || originalImageData === null) {
-          const blob = await new Promise(resolve => {
-            canvas.toBlob(resolve, 'image/png');
-          });
-          
-          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-          
+        if (isImageModified()) {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = addWasModifiedFlag(new File([blob], 'edited-image.png', { type: 'image/png' }));
           imageUrl = await websim.upload(file);
-        } else {
+        } else if (currentImage) {
           imageUrl = currentImage.src;
+        } else {
+          alert('No image to add to gallery');
+          return;
         }
+
+        await removeMatchingImages(getImageFingerprint(imageUrl));
         
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           imageUrl: imageUrl,
           views: 0,
           uses: 0,
-          modified: hasImageBeenModified()
+          modified: isImageModified()
         });
         
         alert('Image added to gallery successfully!');
@@ -917,6 +890,32 @@
       } catch (error) {
         console.error('Error adding to gallery:', error);
         alert('Failed to add image to gallery. Please try again.');
+      }
+    }
+
+    async function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        try {
+          const imageUrl = await websim.upload(file);
+          await removeMatchingImages(getImageFingerprint(imageUrl));
+          const uploadedImage = new Image();
+          uploadedImage.onload = function() {
+            currentImage = uploadedImage;
+            setupImageEditor();
+          };
+          uploadedImage.src = URL.createObjectURL(file);
+          await room.collection('gallery_images').create({
+            imageUrl: imageUrl,
+            prompt: file.name,
+            views: 0,
+            uses: 0,
+            modified: false
+          });
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          alert('Failed to upload image. Please try again.');
+        }
       }
     }
 
@@ -963,6 +962,7 @@
         currentImage = generatedImage;
         
         try {
+          await removeMatchingImages(getImageFingerprint(generatedImage.src));
           await room.collection('gallery_images').create({
             prompt: fullPrompt,
             imageUrl: generatedImage.src,
@@ -970,9 +970,7 @@
             uses: 0,
             modified: false
           });
-          
           setupImageEditor();
-          
         } catch (error) {
           console.error('Error processing generated image:', error);
           alert('Failed to process generated image. Please try again.');
@@ -982,55 +980,35 @@
       imageContainer.appendChild(generatedImage);
     }
 
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        try {
-          const imageUrl = await websim.upload(file);
-          
-          const uploadedImage = new Image();
-          uploadedImage.onload = function() {
-            currentImage = uploadedImage;
-            setupImageEditor();
-          };
-          uploadedImage.src = URL.createObjectURL(file);
-          
-          await room.collection('gallery_images').create({
-            imageUrl: imageUrl,
-            prompt: file.name,
-            views: 0,
-            uses: 0,
-            modified: false,
-            isCustomUpload: true
-          });
-          
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          alert('Failed to upload image. Please try again.');
-        }
-      }
-    }
-
-    function generateImageHash(imageData) {
-      const pixels = imageData.data;
-      let hash = '';
-      for (let i = 0; i < pixels.length; i += 4) {
-        hash += pixels[i].toString(16).padStart(2, '0') + pixels[i + 1].toString(16).padStart(2, '0') + pixels[i + 2].toString(16).padStart(2, '0');
-      }
-      return hash;
-    }
-
-    function hasImageBeenModified() {
-      if (!originalImageData) return true;
+    function isImageModified() {
       const canvas = document.getElementById('editCanvas');
       const ctx = canvas.getContext('2d');
-      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const originalPixels = originalImageData.data;
-      const currentPixels = currentImageData.data;
-      for (let i = 0; i < originalPixels.length; i++) {
-        if (originalPixels[i] !== currentPixels[i]) return true;
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i + 3] === 0) {
+          return true;
+        }
       }
       return false;
+    }
+
+    function addWasModifiedFlag(file) {
+      const newFile = new File([file], `modified-${file.name}`, { type: file.type });
+      return newFile;
+    }
+
+    function getImageFingerprint(imageUrl) {
+      // NOTE: This is a placeholder function, you should implement your own logic to generate a unique fingerprint for each image
+      return imageUrl;
+    }
+
+    async function removeMatchingImages(fingerprint) {
+      // NOTE: This is a placeholder function, you should implement your own logic to remove matching images from the gallery
+      const matchingImages = galleryImages.filter(img => getImageFingerprint(img.imageUrl) === fingerprint);
+      for (const image of matchingImages) {
+        await room.collection('gallery_images').delete(image.id);
+      }
     }
 
     document.addEventListener('keydown', function (e) {

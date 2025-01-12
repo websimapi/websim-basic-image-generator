@@ -120,30 +120,15 @@ function drawSelectionOverlay() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   
-  // Store current image data before drawing selection
-  if (!originalImageData) {
-    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  }
-  
-  // Reset to original image before drawing new selection
   ctx.putImageData(originalImageData, 0, 0);
   
   if (!currentSelection) return;
   
   const width = canvas.width;
   const height = canvas.height;
-
-  // Create temporary canvas for selection overlay
-  if (!selectionCanvas) {
-    selectionCanvas = document.createElement('canvas');
-    selectionCtx = selectionCanvas.getContext('2d');
-  }
   
-  selectionCanvas.width = width;
-  selectionCanvas.height = height;
-  selectionCtx.clearRect(0, 0, width, height);
-  
-  // Draw selection outline
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pos = y * width + x;
@@ -155,18 +140,14 @@ function drawSelectionOverlay() {
           y < height - 1 && !currentSelection[pos + width];
           
         if (isEdge) {
-          selectionCtx.fillStyle = 'white';
-          selectionCtx.fillRect(x - 1, y - 1, 3, 3);
-          selectionCtx.strokeStyle = 'black';
-          selectionCtx.strokeRect(x - 1, y - 1, 3, 3);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(x - 1, y - 1, 3, 3);
+          ctx.strokeStyle = 'black';
+          ctx.strokeRect(x - 1, y - 1, 3, 3);
         }
       }
     }
   }
-  
-  // Draw selection overlay on main canvas
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.drawImage(selectionCanvas, 0, 0);
 }
 
 function setTool(tool) {
@@ -266,36 +247,12 @@ function resetImage() {
   currentSelection = null;
 }
 
-function hasImageBeenModified() {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  // If there's no original image data, it hasn't been modified
-  if (!originalImageData) return false;
-  
-  const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const originalPixels = originalImageData.data;
-  const currentPixels = currentImageData.data;
-  
-  // Compare pixel data
-  for (let i = 0; i < originalPixels.length; i++) {
-    if (originalPixels[i] !== currentPixels[i]) {
-      return true;
-    }
-  }
-  
-  return false;
+function addWasModifiedFlag(file) {
+  file.wasModified = true;
+  return file;
 }
 
-function generateImageHash(imageData) {
-  let hash = 0;
-  const pixels = imageData.data;
-  
-  // Sample pixels at regular intervals for a quick comparison
-  for (let i = 0; i < pixels.length; i += 40) {
-    hash = ((hash << 5) - hash) + pixels[i];
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  return hash;
+function isImageModified() {
+  // Return true if we've used any of the editor tools
+  return currentSelection !== null || originalImageData !== null;
 }
