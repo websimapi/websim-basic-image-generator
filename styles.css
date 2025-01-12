@@ -1,62 +1,231 @@
-/* Add new styles */
-.prompt-history {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
+/* Update/add these mobile-specific styles */
+
+@media (max-width: 768px) {
+  body {
+    padding: 1rem;
+  }
+
+  .container {
+    width: 100%;
+    padding: 5px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .input-group {
+    gap: 0.5rem;
+    flex-direction: column;
+  }
+
+  input, select {
+    width: 100%;
+    max-width: none;
+    min-width: auto;
+    padding: 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .tool-group {
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.5rem;
+  }
+
+  .tool-button {
+    width: 35px;
+    height: 35px;
+    padding: 0.4rem;
+  }
+
+  .tool-button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .color-display {
+    flex-direction: row;
+    align-items: center;
+    padding: 0.3rem;
+    margin: 0.5rem 0;
+  }
+
+  .color-picker {
+    width: 35px;
+    height: 35px;
+  }
+
+  .fill-image-prompt {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .fill-image-prompt input {
+    width: 100%;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .save-button,
+  .add-gallery-button {
+    margin: 0;
+    width: 100%;
+  }
+
+  .gallery {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    padding: 0.5rem;
+  }
+
+  .gallery-header {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .gallery-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    justify-content: center;
+  }
+
+  .gallery-tab {
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .search-container {
+    width: 100%;
+  }
+
+  .search-container input {
+    font-size: 0.9rem;
+  }
+
+  .gallery-pagination {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.8rem;
+  }
+
+  .pagination-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .gallery-item {
+    padding: 0.8rem;
+  }
+
+  .gallery-item img {
+    height: 180px;
+  }
+
+  .gallery-item .metadata {
+    font-size: 0.85rem;
+  }
+
+  .prompt-history {
+    font-size: 0.85rem;
+  }
+
+  .prompt-history details {
+    padding: 0.4rem;
+  }
+
+  .prompt-history ol {
+    margin-left: 1rem;
+  }
+
+  .gallery-item-controls {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+
+  .edit-button,
+  .delete-button {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .editor-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+  }
+
+  canvas, 
+  .generated-image {
+    max-height: 300px;
+  }
+
+  .image-container {
+    padding: 0.5rem;
+    min-height: 200px;
+  }
+
+  .placeholder-text {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .loading {
+    width: 30px;
+    height: 30px;
+  }
 }
 
-.prompt-history details {
-  background: rgba(255,255,255,0.05);
-  padding: 0.5rem;
-  border-radius: 4px;
+/* Add styles for even smaller screens */
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .tool-group {
+    gap: 0.2rem;
+  }
+
+  .tool-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .gallery-item img {
+    height: 160px;
+  }
+
+  .color-display {
+    font-size: 0.8rem;
+  }
+
+  #pageInfo {
+    font-size: 0.8rem;
+  }
 }
 
-.prompt-history summary {
-  cursor: pointer;
-  color: rgba(255,255,255,0.8);
-}
+/* Add touch-friendly interactions */
+@media (hover: none) {
+  .tool-button:hover::after,
+  .tool-button:hover::before {
+    display: none;
+  }
 
-.prompt-history ol {
-  margin: 0.5rem 0 0 1.5rem;
-  padding: 0;
-}
+  .tool-button:active {
+    transform: scale(0.95);
+  }
 
-.prompt-history li {
-  margin-bottom: 0.5rem;
-  color: rgba(255,255,255,0.7);
-}
+  button:hover {
+    transform: none;
+  }
 
-.prompt-date {
-  display: block;
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.5);
-  margin-top: 0.2rem;
-}
-
-.title {
-  font-weight: bold;
-  margin-bottom: 0.3rem;
-}
-
-.title[onclick] {
-  cursor: pointer;
-}
-
-.edit-icon {
-  font-size: 0.8em;
-  opacity: 0.6;
-  margin-left: 0.5rem;
-}
-
-.title:hover .edit-icon {
-  opacity: 1;
-}
-
-/* Update gallery styles */
-.gallery-item .gallery-image {
-  width: 100%;
-  height: 200px;
-  background-size: cover;
-  background-position: center;
-  border-radius: 4px;
-  cursor: pointer;
+  button:active {
+    transform: scale(0.95);
+  }
 }

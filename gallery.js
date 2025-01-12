@@ -1,10 +1,12 @@
 const room = new WebsimSocket();
 let galleryImages = [];
 let currentTab = 'recent';
-let currentPage = 1;
-const itemsPerPage = 12;
 let currentEditId = null;
 let currentSearch = '';
+let imageCounter = 0;
+let currentImage = null;
+let currentPage = 1;
+const itemsPerPage = 10;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -18,7 +20,7 @@ async function initGallery() {
 function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
-
+  
   if (currentSearch) {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
@@ -38,46 +40,33 @@ function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  const start = (currentPage - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  const paginatedImages = images.slice(start, end);
+  // Calculate pagination
+  const totalPages = Math.ceil(images.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const pageImages = images.slice(startIndex, endIndex);
 
-  if (paginatedImages.length === 0) {
+  // Update pagination controls
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById('prevPage').disabled = currentPage === 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+  if (pageImages.length === 0) {
     galleryEl.innerHTML = `
       <div class="no-results">
         ${currentSearch ? 'No images found matching your search' : 'No images available'}
       </div>
     `;
-    document.getElementById('prevPage').disabled = true;
-    document.getElementById('nextPage').disabled = true;
-    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
     return;
   }
 
-  galleryEl.innerHTML = paginatedImages.map(img => `
+  galleryEl.innerHTML = pageImages.map(img => `
     <div class="gallery-item">
-      <div class="gallery-image" style="background-image: url('${img.imageUrl}');" onclick="loadGalleryImage('${img.id}')"></div>
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
-        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
-          ${img.title || 'Untitled'} 
-          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
-        </div>
+        <div>${img.prompt}</div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
-        <div class="prompt-history">
-          <details>
-            <summary>Prompt History</summary>
-            <ol>
-              ${(img.promptHistory || []).map((entry, i) => `
-                <li>
-                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
-                  ${entry.prompt}
-                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
-                </li>
-              `).join('')}
-            </ol>
-          </details>
-        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -85,29 +74,22 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
-
-  document.getElementById('prevPage').disabled = currentPage === 1;
-  document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
 }
 
 async function showGalleryTab(tab) {
   currentTab = tab;
-  currentPage = 1; 
+  currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
   renderGallery();
 }
-
-let imageCounter = 0;
-let currentImage = null;
 
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
@@ -140,37 +122,37 @@ async function loadGalleryImage(id) {
   };
 }
 
-function editTitle(id) {
+function editImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
-  const dialog = document.getElementById('editTitleDialog');
+  const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editTitleInput');
-  input.value = image.title || '';
+  const input = document.getElementById('editPromptInput');
+  input.value = image.prompt;
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
 
 async function saveEdit() {
   if (!currentEditId) return;
-  const input = document.getElementById('editTitleInput');
-  const newTitle = input.value.trim();
-  if (!newTitle) {
-    alert('Please enter a title');
+  const input = document.getElementById('editPromptInput');
+  const newPrompt = input.value.trim();
+  if (!newPrompt) {
+    alert('Please enter a prompt');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    title: newTitle
+    prompt: newPrompt
   });
   cancelEdit();
 }
 
 function cancelEdit() {
   currentEditId = null;
-  const dialog = document.getElementById('editTitleDialog');
+  const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editTitleInput');
+  const input = document.getElementById('editPromptInput');
   input.value = '';
   dialog.style.display = 'none';
   overlay.style.display = 'none';
@@ -184,7 +166,7 @@ async function deleteImage(id) {
 function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
   currentSearch = searchInput.value.trim();
-  currentPage = 1; 
+  currentPage = 1; // Reset to first page when filtering
   renderGallery();
 }
 
@@ -196,13 +178,4 @@ function changePage(delta) {
     currentPage = newPage;
     renderGallery();
   }
-}
-
-function setupImageEditor() {
-  // You need to implement this function
-}
-
-// Add this function to your code
-function editPrompt(id) {
-  // You need to implement this function
 }
