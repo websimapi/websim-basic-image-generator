@@ -653,9 +653,26 @@
         <div class="gallery-item">
           <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
           <div class="metadata">
-            <div>${img.prompt}</div>
+            <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+              ${img.title || 'Untitled'} 
+              ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+            </div>
             <div>by ${img.username}</div>
             <div>${new Date(img.created_at).toLocaleDateString()}</div>
+            <div class="prompt-history">
+              <details>
+                <summary>Prompt History</summary>
+                <ol>
+                  ${(img.promptHistory || []).map((entry, i) => `
+                    <li>
+                      ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
+                      ${entry.prompt}
+                      <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+                    </li>
+                  `).join('')}
+                </ol>
+              </details>
+            </div>
           </div>
           <div class="stats">
             <span>${img.views || 0} views</span>
@@ -663,7 +680,7 @@
           </div>
           ${img.username === room.party.client.username ? `
             <div class="gallery-item-controls">
-              <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+              <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
               <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
             </div>
           ` : ''}
@@ -690,9 +707,11 @@
     async function loadGalleryImage(id) {
       const image = galleryImages.find(img => img.id === id);
       if (!image) return;
+      
       await room.collection('gallery_images').update(id, {
         views: (image.views || 0) + 1
       });
+      
       const imageContainer = document.getElementById('imageContainer');
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
@@ -993,11 +1012,17 @@
           try {
             // Add to gallery with the final generation URL
             await room.collection('gallery_images').create({
+              title: promptInput.value.trim().substring(0, 50), // Use first 50 chars as initial title
               prompt: fullPrompt,
-              imageUrl: generatedImage.src, // Use the final URL directly
+              imageUrl: generatedImage.src,
               views: 0,
               uses: 0,
-              modified: false
+              modified: false,
+              promptHistory: [{
+                type: 'original',
+                prompt: fullPrompt,
+                timestamp: new Date().toISOString()
+              }]
             });
             
             setupImageEditor();
@@ -1076,7 +1101,7 @@
       generatedImage.alt = fullPrompt;
 
       // When image loads (generation complete)
-      generatedImage.onload = function() {
+      generatedImage.onload = async function() {
         loadingSpinner.style.display = 'none';
         
         const canvas = document.getElementById('editCanvas');
@@ -1141,12 +1166,41 @@
         ctx.putImageData(imageData, 0, 0);
         originalImageData = imageData;
 
-        // Cleanup
-        document.getElementById('fillImagePrompt').style.display = 'none';
-        generatedImage.remove();
+        // Get the parent image's prompt history
+        const parentImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+        const promptHistory = parentImage ? [...(parentImage.promptHistory || [])] : [];
+        
+        // Add new prompt history entry
+        promptHistory.push({
+          type: 'selection',
+          prompt: fullPrompt,
+          timestamp: new Date().toISOString(),
+          parentId: parentImage ? parentImage.id : null
+        });
+        
+        try {
+          // Convert canvas to blob
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+          const imageUrl = await websim.upload(file);
+          
+          // Create new gallery entry with full history
+          await room.collection('gallery_images').create({
+            title: `${parentImage ? parentImage.title + ' (Modified)' : 'Untitled'}`,
+            prompt: fullPrompt,
+            imageUrl: imageUrl,
+            views: 0,
+            uses: 0,
+            modified: true,
+            promptHistory,
+            parentId: parentImage ? parentImage.id : null
+          });
+          
+        } catch (error) {
+          console.error('Error saving modified image:', error);
+          alert('Failed to save modified image');
+        }
       };
-
-      // Add image to document (hidden) to begin generation
       document.body.appendChild(generatedImage);
     }
 
@@ -1160,40 +1214,21 @@
       if (!e.ctrlKey) isCtrlPressed = false;
     });
 
-    function editImage(id) {
+    async function editTitle(id) {
       const image = galleryImages.find(img => img.id === id);
       if (!image) return;
-      currentEditId = id;
-      const dialog = document.getElementById('editPromptDialog');
-      const overlay = document.getElementById('overlay');
-      const input = document.getElementById('editPromptInput');
-      input.value = image.prompt;
-      dialog.style.display = 'block';
-      overlay.style.display = 'block';
-    }
-
-    async function saveEdit() {
-      if (!currentEditId) return;
-      const input = document.getElementById('editPromptInput');
-      const newPrompt = input.value.trim();
-      if (!newPrompt) {
-        alert('Please enter a prompt');
-        return;
+      
+      const newTitle = prompt('Enter new title:', image.title || 'Untitled');
+      if (newTitle === null) return; // User canceled
+      
+      try {
+        await room.collection('gallery_images').update(id, {
+          title: newTitle
+        });
+      } catch (err) {
+        console.error('Failed to update title:', err);
+        alert('Failed to update title');
       }
-      await room.collection('gallery_images').update(currentEditId, {
-        prompt: newPrompt
-      });
-      cancelEdit();
-    }
-
-    function cancelEdit() {
-      currentEditId = null;
-      const dialog = document.getElementById('editPromptDialog');
-      const overlay = document.getElementById('overlay');
-      const input = document.getElementById('editPromptInput');
-      input.value = '';
-      dialog.style.display = 'none';
-      overlay.style.display = 'none';
     }
 
     async function deleteImage(id) {
