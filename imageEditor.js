@@ -120,15 +120,30 @@ function drawSelectionOverlay() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   
+  // Store current image data before drawing selection
+  if (!originalImageData) {
+    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+  
+  // Reset to original image before drawing new selection
   ctx.putImageData(originalImageData, 0, 0);
   
   if (!currentSelection) return;
   
   const width = canvas.width;
   const height = canvas.height;
+
+  // Create temporary canvas for selection overlay
+  if (!selectionCanvas) {
+    selectionCanvas = document.createElement('canvas');
+    selectionCtx = selectionCanvas.getContext('2d');
+  }
   
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
+  selectionCanvas.width = width;
+  selectionCanvas.height = height;
+  selectionCtx.clearRect(0, 0, width, height);
+  
+  // Draw selection outline
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pos = y * width + x;
@@ -140,14 +155,18 @@ function drawSelectionOverlay() {
           y < height - 1 && !currentSelection[pos + width];
           
         if (isEdge) {
-          ctx.fillStyle = 'white';
-          ctx.fillRect(x - 1, y - 1, 3, 3);
-          ctx.strokeStyle = 'black';
-          ctx.strokeRect(x - 1, y - 1, 3, 3);
+          selectionCtx.fillStyle = 'white';
+          selectionCtx.fillRect(x - 1, y - 1, 3, 3);
+          selectionCtx.strokeStyle = 'black';
+          selectionCtx.strokeRect(x - 1, y - 1, 3, 3);
         }
       }
     }
   }
+  
+  // Draw selection overlay on main canvas
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(selectionCanvas, 0, 0);
 }
 
 function setTool(tool) {
