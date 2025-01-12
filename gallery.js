@@ -1,12 +1,17 @@
 const room = new WebsimSocket();
 let galleryImages = [];
 let currentTab = 'recent';
+let currentPage = 1;
+const itemsPerPage = 12;
 let currentEditId = null;
 let currentSearch = '';
-let imageCounter = 0;
 let currentImage = null;
-let currentPage = 1;
-const itemsPerPage = 10;
+let originalImageData = null;
+let currentSelection = null;
+let isShiftPressed = false;
+let isCtrlPressed = false;
+let selectionCanvas = null;
+let selectionCtx = null;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -40,33 +45,33 @@ function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(images.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const pageImages = images.slice(startIndex, endIndex);
+  const start = (currentPage - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  const paginatedImages = images.slice(start, end);
 
-  // Update pagination controls
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
-  document.getElementById('prevPage').disabled = currentPage === 1;
-  document.getElementById('nextPage').disabled = currentPage >= totalPages;
-
-  if (pageImages.length === 0) {
+  if (paginatedImages.length === 0) {
     galleryEl.innerHTML = `
       <div class="no-results">
         ${currentSearch ? 'No images found matching your search' : 'No images available'}
       </div>
     `;
+    document.getElementById('prevPage').disabled = true;
+    document.getElementById('nextPage').disabled = true;
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
     return;
   }
 
-  galleryEl.innerHTML = pageImages.map(img => `
+  galleryEl.innerHTML = paginatedImages.map(img => `
     <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div class="gallery-image" style="background-image: url('${img.imageUrl}');" onclick="loadGalleryImage('${img.id}')"></div>
       <div class="metadata">
-        <div>${img.prompt}</div>
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <!-- Prompt history and other info -->
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -74,17 +79,20 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
+  document.getElementById('prevPage').disabled = currentPage === 1;
+  document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
 }
 
 async function showGalleryTab(tab) {
   currentTab = tab;
-  currentPage = 1; // Reset to first page when changing tabs
+  currentPage = 1; 
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
@@ -104,7 +112,7 @@ async function loadGalleryImage(id) {
   existingImages.forEach(img => img.remove());
   
   const generatedImage = document.createElement('img');
-  generatedImage.id = `generatedImage_${imageCounter++}`;
+  generatedImage.id = `generatedImage_${Math.floor(Math.random() * 1000)}`;
   generatedImage.className = 'generated-image';
   generatedImage.style.display = 'none';
   generatedImage.crossOrigin = 'anonymous';
@@ -166,16 +174,14 @@ async function deleteImage(id) {
 function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
   currentSearch = searchInput.value.trim();
-  currentPage = 1; // Reset to first page when filtering
   renderGallery();
 }
 
 function changePage(delta) {
-  const newPage = currentPage + delta;
-  const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
-  
-  if (newPage >= 1 && newPage <= totalPages) {
-    currentPage = newPage;
-    renderGallery();
-  }
+  currentPage += delta;
+  renderGallery();
 }
+
+window.addEventListener('load', async () => {
+  await initGallery();
+});
