@@ -6,6 +6,9 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
+let toleranceValue = 32; // Default tolerance value
+let lastClickX = 0;
+let lastClickY = 0;
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -37,21 +40,59 @@ function setupImageEditor() {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.hasEventListener = true;
   }
+
+  // Add tolerance control if it doesn't exist yet
+  if (!document.querySelector('.tolerance-control')) {
+    const toleranceControl = document.createElement('div');
+    toleranceControl.className = 'tolerance-control';
+    toleranceControl.innerHTML = `
+      <label for="toleranceSlider">Selection Tolerance: <span id="toleranceValue">32</span></label>
+      <input type="range" id="toleranceSlider" min="0" max="255" value="32">
+    `;
+    document.querySelector('.tool-group').appendChild(toleranceControl);
+    
+    // Add event listener for tolerance slider
+    const toleranceSlider = document.getElementById('toleranceSlider');
+    const toleranceDisplay = document.getElementById('toleranceValue');
+    toleranceSlider.addEventListener('input', (e) => {
+      toleranceValue = parseInt(e.target.value);
+      toleranceDisplay.textContent = toleranceValue;
+      if (currentSelection && lastClickX && lastClickY) {
+        const canvas = document.getElementById('editCanvas');
+        const rect = canvas.getBoundingClientRect();
+        const lastClick = {
+          x: (lastClickX - rect.left) * (canvas.width / rect.width),
+          y: (lastClickY - rect.top) * (canvas.height / rect.height)
+        };
+        updateSelection(lastClick.x, lastClick.y);
+      }
+    });
+  }
 }
 
 function handleCanvasClick(e) {
   const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (canvas.width / rect.width);
   const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  
+  // Store click coordinates
+  lastClickX = e.clientX;
+  lastClickY = e.clientY;
+  
+  updateSelection(x, y);
+}
+
+function updateSelection(x, y) {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
 
   if (!isShiftPressed && !isCtrlPressed) {
     currentSelection = null;
   }
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
+  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), toleranceValue);
 
   if (isShiftPressed || isCtrlPressed) {
     if (currentSelection) {
