@@ -6,39 +6,8 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
-
-// Add history stack for tracking changes 
-let imageHistory = [];
-let currentHistoryIndex = -1;
-
-function saveToHistory() {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  
-  // Remove any redo states
-  imageHistory = imageHistory.slice(0, currentHistoryIndex + 1);
-  
-  // Add new state
-  imageHistory.push(imageData);
-  currentHistoryIndex++;
-  
-  // Limit history size
-  if (imageHistory.length > 20) {
-    imageHistory.shift();
-    currentHistoryIndex--;
-  }
-}
-
-function undo() {
-  if (currentHistoryIndex > 0) {
-    currentHistoryIndex--;
-    const canvas = document.getElementById('editCanvas');
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(imageHistory[currentHistoryIndex], 0, 0);
-    originalImageData = imageHistory[currentHistoryIndex];
-  }
-}
+let selectionHistory = []; // Array to store previous selections and their image data
+let hiddenLayers = new Set(); // Track which layers are currently hidden
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -56,11 +25,6 @@ function setupImageEditor() {
     canvas.height = currentImage.naturalHeight;
     ctx.drawImage(currentImage, 0, 0);
     originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Initialize history with original state
-    imageHistory = [originalImageData];
-    currentHistoryIndex = 0;
-    
     currentImage.style.display = 'none';
     canvas.style.display = 'block';
     editorControls.style.display = 'flex';
@@ -219,11 +183,6 @@ function setTool(tool) {
         fillImagePrompt.style.display = 'flex';
       }
       break;
-    case 'clearSelection':
-      if (currentSelection) {
-        clearSelectionContent();
-      }
-      break;
     default:
       fillImagePrompt.style.display = 'none';
   }
@@ -255,8 +214,6 @@ function fillSelection() {
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
-  
-  saveToHistory();
 }
 
 function setSelectionAlpha() {
@@ -266,18 +223,31 @@ function setSelectionAlpha() {
   const ctx = canvas.getContext('2d');
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = imageData.data;
+
+  // Store the current selection and its pixels before making them transparent
+  const selectionLayer = {
+    id: Date.now(),
+    selection: new Uint8Array(currentSelection),
+    originalPixels: new Uint8Array(pixels), // Store original pixels
+    bounds: calculateSelectionBounds(currentSelection, canvas.width, canvas.height)
+  };
+
+  // Add to history
+  selectionHistory.push(selectionLayer);
   
+  // Create UI control for this layer
+  addLayerControl(selectionLayer);
+
+  // Make selected pixels transparent
   for (let i = 0; i < currentSelection.length; i++) {
     if (currentSelection[i]) {
       const pixelPos = i * 4;
-      pixels[pixelPos + 3] = 0;
+      pixels[pixelPos + 3] = 0; // Set alpha to 0
     }
   }
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
-  
-  saveToHistory();
 }
 
 function clearSelection() {
@@ -294,28 +264,104 @@ function resetImage() {
   currentSelection = null;
 }
 
-function clearSelectionContent() {
-  if (!currentSelection) {
-    alert('Please make a selection first');
-    return;
-  }
-
-  // Save current state before making changes
-  saveToHistory();
-
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const pixels = imageData.data;
-
-  // Set alpha to 0 for selected pixels
-  for (let i = 0; i < currentSelection.length; i++) {
-    if (currentSelection[i]) {
-      const pixelPos = i * 4;
-      pixels[pixelPos + 3] = 0; // Set alpha to 0
+function calculateSelectionBounds(selection, width, height) {
+  let minX = width, minY = height, maxX = 0, maxY = 0;
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pos = y * width + x;
+      if (selection[pos]) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
     }
   }
+  
+  return { minX, minY, maxX, maxY };
+}
 
-  ctx.putImageData(imageData, 0, 0);
-  originalImageData = imageData;
+function addLayerControl(layer) {
+  const layerControls = document.getElementById('layerControls');
+  if (!layerControls) {
+    // Create layer controls container if it doesn't exist
+    const container = document.createElement('div');
+    container.id = 'layerControls';
+    container.className = 'layer-controls';
+    document.getElementById('editorControls').appendChild(container);
+  }
+  
+  const layerElement = document.createElement('div');
+  layerElement.className = 'layer-item';
+  layerElement.innerHTML = `
+    <div class="layer-preview"></div>
+    <span>Selection ${selectionHistory.length}</span>
+    <label class="layer-visibility">
+      <input type="checkbox" checked onchange="toggleLayer(${layer.id})">
+      <span class="checkbox-custom"></span>
+    </label>
+  `;
+  
+  document.getElementById('layerControls').appendChild(layerElement);
+  
+  // Create mini preview
+  const preview = layerElement.querySelector('.layer-preview');
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const bounds = layer.bounds;
+  
+  canvas.width = bounds.maxX - bounds.minX + 1;
+  canvas.height = bounds.maxY - bounds.minY + 1;
+  
+  // Draw preview
+  const imageData = new ImageData(
+    new Uint8ClampedArray(layer.originalPixels.buffer),
+    document.getElementById('editCanvas').width
+  );
+  ctx.putImageData(imageData, -bounds.minX, -bounds.minY);
+  
+  preview.appendChild(canvas);
+}
+
+function toggleLayer(layerId) {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  if (hiddenLayers.has(layerId)) {
+    hiddenLayers.delete(layerId);
+  } else {
+    hiddenLayers.add(layerId);
+  }
+  
+  // Redraw canvas with current visibility settings
+  redrawLayers();
+}
+
+function redrawLayers() {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Start with original image
+  ctx.putImageData(originalImageData, 0, 0);
+  
+  // Apply each visible layer
+  selectionHistory.forEach(layer => {
+    if (!hiddenLayers.has(layer.id)) {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      
+      for (let i = 0; i < layer.selection.length; i++) {
+        if (layer.selection[i]) {
+          const pixelPos = i * 4;
+          pixels[pixelPos] = layer.originalPixels[pixelPos];
+          pixels[pixelPos + 1] = layer.originalPixels[pixelPos + 1];
+          pixels[pixelPos + 2] = layer.originalPixels[pixelPos + 2];
+          pixels[pixelPos + 3] = layer.originalPixels[pixelPos + 3];
+        }
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+    }
+  });
 }

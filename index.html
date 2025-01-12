@@ -487,7 +487,7 @@
         <div class="tool-group">
           <button class="tool-button" onclick="setTool('magicWand')" id="magicWandTool" data-tooltip="Magic Wand">
             <svg viewBox="0 0 24 24">
-              <path d="M7,5L3,9L9,15L13,11L7,5M16,12L12,16L14,18L18,14L16,12M12.8,2.6L16,5.8L18.6,3.2L15.4,0L12.8,2.6M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
+              <path d="M7,5L3,9L9,15L13,11L7,5M16,12L12,16L14,18L18,14L16,12M12.8,2.6L16,5.8L18.6,3.2L15.4,0L12.8,2.6M21.4,11.6L24,14.2L21.4,16.8L18.8,14.2L21.4,11.6M0,18L3,21L5.6,18.4L2.6,15.4L0,18Z"/>
             </svg>
           </button>
           
@@ -509,15 +509,9 @@
             </svg>
           </button>
 
-          <button class="tool-button" onclick="setTool('clearSelection')" id="clearSelectionTool" data-tooltip="Clear Selection Content">
+          <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool" data-tooltip="Clear Selection">
             <svg viewBox="0 0 24 24">
-              <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
-            </svg>
-          </button>
-
-          <button class="tool-button" onclick="undo()" id="undoTool" data-tooltip="Undo">
-            <svg viewBox="0 0 24 24">
-              <path d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"/>
+              <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
             </svg>
           </button>
 
@@ -569,7 +563,6 @@
     let isCtrlPressed = false;
     let selectionCanvas = null;
     let selectionCtx = null;
-    let undoStack = [];
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
@@ -718,7 +711,6 @@
         currentSelection = newSelection;
       }
       drawSelectionOverlay();
-      undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     }
 
     function magicWandSelect(imageData, startX, startY, tolerance) {
@@ -822,7 +814,6 @@
       }
       ctx.putImageData(imageData, 0, 0);
       originalImageData = imageData;
-      undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     }
 
     function setSelectionAlpha() {
@@ -839,7 +830,6 @@
       }
       ctx.putImageData(imageData, 0, 0);
       originalImageData = imageData;
-      undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     }
 
     function clearSelection() {
@@ -854,16 +844,6 @@
       const ctx = canvas.getContext('2d');
       ctx.putImageData(originalImageData, 0, 0);
       currentSelection = null;
-    }
-
-    function undo() {
-      if (undoStack.length > 1) {
-        undoStack.pop();
-        const canvas = document.getElementById('editCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
-        originalImageData = undoStack[undoStack.length - 1];
-      }
     }
 
     function saveImage() {
