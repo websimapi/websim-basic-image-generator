@@ -87,7 +87,7 @@
       transform: scale(1.05);
     }
 
-    .canvas-container {
+    .image-container {
       margin-top: 2rem;
       padding: 1rem;
       background: rgba(255,255,255,0.1);
@@ -363,6 +363,13 @@
       grid-column: 1 / -1;
     }
 
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
     @media (max-width: 600px) {
       body {
         padding: 1rem;
@@ -400,7 +407,7 @@
         height: 20px;
       }
 
-      .canvas-container {
+      .image-container {
         padding: 0.5rem;
       }
 
@@ -441,11 +448,12 @@
         <div class="search-container">
           <input type="text" id="gallerySearch" placeholder="Search images by title or username..." onkeyup="filterGallery()">
           <svg class="search-icon" viewBox="0 0 24 24">
-            <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
+            <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29M21.4,11.6L24,14.2L21.4,16.8L18.8,14.2L21.4,11.6M0,18L3,21L5.6,18.4L2.6,15.4L0,18Z"/>
           </svg>
         </div>
       </div>
       <div id="gallery" class="gallery"></div>
+      <div id="pagination" class="pagination"></div>
     </div>
 
     <!-- Image Generation Controls -->
@@ -479,7 +487,7 @@
     </div>
 
     <!-- Image Editor -->
-    <div class="canvas-container" id="canvasContainer">
+    <div class="image-container" id="imageContainer">
       <div id="loadingSpinner" class="loading" style="display: none;"></div>
       <div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image or load one from your device</div>
       <canvas id="editCanvas"></canvas>
@@ -641,7 +649,7 @@
       await room.collection('gallery_images').update(id, {
         views: (image.views || 0) + 1
       });
-      const imageContainer = document.getElementById('canvasContainer');
+      const imageContainer = document.getElementById('imageContainer');
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
       const generatedImage = document.createElement('img');
@@ -896,7 +904,7 @@
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
       
-      const imageContainer = document.getElementById('canvasContainer');
+      const imageContainer = document.getElementById('imageContainer');
       const loadingSpinner = document.getElementById('loadingSpinner');
       const placeholderText = document.getElementById('placeholderText');
       const saveButton = document.getElementById('saveButton');
