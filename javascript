@@ -120,7 +120,8 @@ async function loadGalleryImage(id) {
         prompt: latestPrompt,
         timestamp: new Date().toISOString(),
         usedImageId: image.id,
-        usedImageTitle: image.title || 'Untitled'
+        usedImageTitle: image.title || 'Untitled',
+        username: room.party.client.username
       });
 
       // Update the prompt history in the database
@@ -166,7 +167,9 @@ function renderGalleryItem(img) {
     return `
       <li>
         ${entryHtml}
-        <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+        <span class="prompt-date">
+          by ${entry.username} on ${new Date(entry.timestamp).toLocaleString()}
+        </span>
       </li>
     `;
   }).join('');
@@ -426,11 +429,18 @@ async function addToGallery() {
     
     // Add to gallery with the uploaded URL
     await room.collection('gallery_images').create({
+      title: promptInput.value.trim().substring(0, 50),
       prompt: fullPrompt,
       imageUrl: imageUrl,
       views: 0,
       uses: 0,
-      modified: true // Flag to indicate this was edited
+      modified: true, 
+      promptHistory: [{
+        type: 'original',
+        prompt: fullPrompt,
+        timestamp: new Date().toISOString(),
+        username: room.party.client.username
+      }]
     });
     
     alert('Image added to gallery successfully!');
@@ -494,18 +504,18 @@ function generateImage() {
       try {
         // Add to gallery with the final generation URL
         await room.collection('gallery_images').create({
+          title: promptInput.value.trim().substring(0, 50),
           prompt: fullPrompt,
-          imageUrl: generatedImage.src, // Use the final URL directly
+          imageUrl: generatedImage.src,
           views: 0,
           uses: 0,
-          modified: false
-        });
-        
-        // Save prompt history
-        promptHistory.push({
-          type: 'original',
-          prompt: fullPrompt,
-          timestamp: new Date().toISOString()
+          modified: false,
+          promptHistory: [{
+            type: 'original',
+            prompt: fullPrompt,
+            timestamp: new Date().toISOString(),
+            username: room.party.client.username
+          }]
         });
         
         setupImageEditor();
@@ -654,7 +664,8 @@ function generateSelectionFill() {
       type: 'selection',
       prompt: prompt,
       timestamp: new Date().toISOString(),
-      parentId: generatedImage.alt
+      parentId: currentImage ? currentImage.id : null,
+      username: room.party.client.username
     });
 
     // Cleanup
