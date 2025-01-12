@@ -246,22 +246,3 @@ function resetImage() {
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
 }
-
-function hasImageBeenModified() {
-  const canvas = document.getElementById('editCanvas');
-  if (!canvas || !originalImageData) return false;
-  
-  const ctx = canvas.getContext('2d');
-  const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const originalPixels = originalImageData.data;
-  const currentPixels = currentImageData.data;
-  
-  // Compare pixel data to see if any changes were made
-  for (let i = 0; i < originalPixels.length; i++) {
-    if (originalPixels[i] !== currentPixels[i]) {
-      return true;
-    }
-  }
-  
-  return false;
-}

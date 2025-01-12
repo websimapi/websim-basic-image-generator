@@ -5,6 +5,8 @@ let currentEditId = null;
 let currentSearch = '';
 let imageCounter = 0;
 let currentImage = null;
+let currentPage = 1;
+const itemsPerPage = 10;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -38,7 +40,18 @@ function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  if (images.length === 0) {
+  // Calculate pagination
+  const totalPages = Math.ceil(images.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const pageImages = images.slice(startIndex, endIndex);
+
+  // Update pagination controls
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById('prevPage').disabled = currentPage === 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+  if (pageImages.length === 0) {
     galleryEl.innerHTML = `
       <div class="no-results">
         ${currentSearch ? 'No images found matching your search' : 'No images available'}
@@ -47,7 +60,7 @@ function renderGallery() {
     return;
   }
 
-  galleryEl.innerHTML = images.map(img => `
+  galleryEl.innerHTML = pageImages.map(img => `
     <div class="gallery-item">
       <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
@@ -71,6 +84,7 @@ function renderGallery() {
 
 async function showGalleryTab(tab) {
   currentTab = tab;
+  currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
@@ -152,5 +166,16 @@ async function deleteImage(id) {
 function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
   currentSearch = searchInput.value.trim();
+  currentPage = 1; // Reset to first page when filtering
   renderGallery();
+}
+
+function changePage(delta) {
+  const newPage = currentPage + delta;
+  const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
+  
+  if (newPage >= 1 && newPage <= totalPages) {
+    currentPage = newPage;
+    renderGallery();
+  }
 }
