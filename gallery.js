@@ -46,6 +46,23 @@ function renderGallery() {
   const endIndex = startIndex + itemsPerPage;
   const pageImages = images.slice(startIndex, endIndex);
 
+  // Update views count for visible images
+  const updateViewCounts = async () => {
+    for (const img of pageImages) {
+      await room.collection('gallery_images').update(img.id, {
+        views: (img.views || 0) + 1
+      });
+    }
+  };
+  
+  // Only update view counts if images are newly loaded
+  const visibleImageIds = new Set(pageImages.map(img => img.id));
+  const previousImageIds = new Set(galleryEl.querySelectorAll('.gallery-item').map(el => el.dataset.imageId));
+  
+  if (!areSetsEqual(visibleImageIds, previousImageIds)) {
+    updateViewCounts();
+  }
+
   // Update pagination controls
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
   document.getElementById('prevPage').disabled = currentPage === 1;
@@ -61,7 +78,7 @@ function renderGallery() {
   }
 
   galleryEl.innerHTML = pageImages.map(img => `
-    <div class="gallery-item">
+    <div class="gallery-item" data-image-id="${img.id}">
       <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
         <div>${img.prompt}</div>
@@ -69,8 +86,8 @@ function renderGallery() {
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
       </div>
       <div class="stats">
-        <span>${img.views || 0} views</span>
-        <span>${img.uses || 0} uses</span>
+        <span>👁️ ${img.views || 0}</span>
+        <span>🖱️ ${img.uses || 0}</span>
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
@@ -80,6 +97,13 @@ function renderGallery() {
       ` : ''}
     </div>
   `).join('');
+}
+
+// Helper function to compare sets
+function areSetsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (let item of a) if (!b.has(item)) return false;
+  return true;
 }
 
 async function showGalleryTab(tab) {
@@ -95,8 +119,9 @@ async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   
+  // Increment uses count when image is clicked
   await room.collection('gallery_images').update(id, {
-    views: (image.views || 0) + 1
+    uses: (image.uses || 0) + 1
   });
 
   const imageContainer = document.getElementById('imageContainer');
@@ -119,6 +144,8 @@ async function loadGalleryImage(id) {
   
   currentImage.onload = function () {
     setupImageEditor();
+    // Scroll to editor section when image is clicked
+    document.querySelector('.editor-section').scrollIntoView({ behavior: 'smooth' });
   };
 }
 
