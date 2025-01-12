@@ -247,12 +247,18 @@ function resetImage() {
   currentSelection = null;
 }
 
-function addWasModifiedFlag(file) {
-  file.wasModified = true;
-  return file;
-}
+function hasImageBeenModified() {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const currentPixels = currentImageData.data;
+  const originalPixels = originalImageData.data;
 
-function isImageModified() {
-  // Return true if we've used any of the editor tools
-  return currentSelection !== null || originalImageData !== null;
+  // Compare each pixel
+  for (let i = 0; i < currentPixels.length; i++) {
+    if (currentPixels[i] !== originalPixels[i]) {
+      return true;
+    }
+  }
+  return false;
 }
