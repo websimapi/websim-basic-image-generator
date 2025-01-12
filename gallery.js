@@ -6,7 +6,7 @@ let currentSearch = '';
 let currentPage = 1;
 let imageCounter = 0;
 let currentImage = null;
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 10;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -21,6 +21,145 @@ function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
   
+  // Apply filters
+  if (currentSearch) {
+    const searchLower = currentSearch.toLowerCase();
+    images = images.filter(img => 
+      img.prompt.toLowerCase().includes(searchLower) || 
+      img.username.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Apply sorting based on current tab
+  switch (currentTab) {
+    case 'popular':
+      images.sort((a, b) => (b.views || 0) - (a.views || 0));
+      break;
+    case 'my':
+      images = images.filter(img => img.username === room.party.client.username);
+      break;
+    default:
+      images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedImages = images.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  if (images.length === 0) {
+    galleryEl.innerHTML = `
+      <div class="no-results">
+        ${currentSearch ? 'No images found matching your search' : 'No images available'}
+      </div>
+    `;
+    return;
+  }
+
+  // Render images
+  galleryEl.innerHTML = `
+    <div class="gallery-grid">
+      ${paginatedImages.map(img => `
+        <div class="gallery-item">
+          <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+          <div class="metadata">
+            <div>${img.prompt}</div>
+            <div>by ${img.username}</div>
+            <div>${new Date(img.created_at).toLocaleDateString()}</div>
+          </div>
+          <div class="stats">
+            <span>${img.views || 0} views</span>
+            <span>${img.uses || 0} uses</span>
+          </div>
+          ${img.username === room.party.client.username ? `
+            <div class="gallery-item-controls">
+              <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+              <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+    </div>
+    
+    <div class="pagination">
+      ${renderPagination(currentPage, totalPages)}
+    </div>
+  `;
+}
+
+function renderPagination(currentPage, totalPages) {
+  if (totalPages <= 1) return '';
+
+  let pages = [];
+  
+  // Previous button
+  pages.push(`
+    <button 
+      onclick="changePage(${currentPage - 1})" 
+      class="page-button prev" 
+      ${currentPage === 1 ? 'disabled' : ''}
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+      </svg>
+    </button>
+  `);
+
+  // Always show first page
+  pages.push(`<button onclick="changePage(1)" class="page-button ${currentPage === 1 ? 'active' : ''}">1</button>`);
+
+  // Calculate range of pages to show
+  let start = Math.max(2, currentPage - 2);
+  let end = Math.min(totalPages - 1, currentPage + 2);
+
+  // Show ellipsis after first page
+  if (start > 2) {
+    pages.push('<span class="ellipsis">...</span>');
+  }
+
+  // Show pages
+  for (let i = start; i <= end; i++) {
+    pages.push(`
+      <button 
+        onclick="changePage(${i})" 
+        class="page-button ${currentPage === i ? 'active' : ''}"
+      >${i}</button>
+    `);
+  }
+
+  // Show ellipsis before last page
+  if (end < totalPages - 1) {
+    pages.push('<span class="ellipsis">...</span>');
+  }
+
+  // Always show last page
+  if (totalPages > 1) {
+    pages.push(`
+      <button 
+        onclick="changePage(${totalPages})" 
+        class="page-button ${currentPage === totalPages ? 'active' : ''}"
+      >${totalPages}</button>
+    `);
+  }
+
+  // Next button
+  pages.push(`
+    <button 
+      onclick="changePage(${currentPage + 1})" 
+      class="page-button next" 
+      ${currentPage === totalPages ? 'disabled' : ''}
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+      </svg>
+    </button>
+  `);
+
+  return pages.join('');
+}
+
+function changePage(newPage) {
+  const images = [...galleryImages];
   if (currentSearch) {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
@@ -41,126 +180,23 @@ function renderGallery() {
   }
 
   const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
-  const start = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedImages = images.slice(start, start + ITEMS_PER_PAGE);
-
-  if (images.length === 0) {
-    galleryEl.innerHTML = `
-      <div class="no-results">
-        ${currentSearch ? 'No images found matching your search' : 'No images available'}
-      </div>
-    `;
-    document.getElementById('pagination').style.display = 'none';
-    return;
+  if (newPage >= 1 && newPage <= totalPages) {
+    currentPage = newPage;
+    renderGallery();
+    // Scroll to top of gallery
+    document.querySelector('.gallery-container').scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start' 
+    });
   }
-
-  galleryEl.innerHTML = paginatedImages.map(img => `
-    <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
-      <div class="metadata">
-        <div class="prompt">${img.prompt}</div>
-        <div class="username">by ${img.username}</div>
-        <div class="date">${new Date(img.created_at).toLocaleDateString()}</div>
-      </div>
-      <div class="stats">
-        <span><i class="fa fa-eye"></i> ${img.views || 0}</span>
-        <span><i class="fa fa-paint-brush"></i> ${img.uses || 0}</span>
-      </div>
-      ${img.username === room.party.client.username ? `
-        <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
-          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
-
-  renderPagination(totalPages);
-}
-
-function renderPagination(totalPages) {
-  const paginationEl = document.getElementById('pagination');
-  
-  if (totalPages <= 1) {
-    paginationEl.style.display = 'none';
-    return;
-  }
-
-  let paginationHTML = '';
-  
-  // Previous button
-  paginationHTML += `
-    <button 
-      class="pagination-btn prev" 
-      onclick="changePage(${currentPage - 1})"
-      ${currentPage === 1 ? 'disabled' : ''}>
-      ←
-    </button>
-  `;
-
-  // First page
-  if (currentPage > 3) {
-    paginationHTML += `
-      <button class="pagination-btn" onclick="changePage(1)">1</button>
-      ${currentPage > 4 ? '<span class="pagination-ellipsis">...</span>' : ''}
-    `;
-  }
-
-  // Page numbers around current page
-  for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
-    paginationHTML += `
-      <button 
-        class="pagination-btn ${i === currentPage ? 'active' : ''}" 
-        onclick="changePage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-
-  // Last page
-  if (currentPage < totalPages - 2) {
-    paginationHTML += `
-      ${currentPage < totalPages - 3 ? '<span class="pagination-ellipsis">...</span>' : ''}
-      <button class="pagination-btn" onclick="changePage(${totalPages})">${totalPages}</button>
-    `;
-  }
-
-  // Next button
-  paginationHTML += `
-    <button 
-      class="pagination-btn next" 
-      onclick="changePage(${currentPage + 1})"
-      ${currentPage === totalPages ? 'disabled' : ''}>
-      →
-    </button>
-  `;
-
-  paginationEl.innerHTML = paginationHTML;
-  paginationEl.style.display = 'flex';
-}
-
-function changePage(newPage) {
-  if (newPage < 1) return;
-  const totalPages = Math.ceil(galleryImages.length / ITEMS_PER_PAGE);
-  if (newPage > totalPages) return;
-  
-  currentPage = newPage;
-  renderGallery();
-  
-  // Smooth scroll to top of gallery
-  document.querySelector('.gallery-container').scrollIntoView({ 
-    behavior: 'smooth',
-    block: 'start'
-  });
 }
 
 async function showGalleryTab(tab) {
   currentTab = tab;
-  currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
-  renderGallery();
+  changePage(1);
 }
 
 async function loadGalleryImage(id) {
@@ -238,6 +274,5 @@ async function deleteImage(id) {
 function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
   currentSearch = searchInput.value.trim();
-  currentPage = 1; // Reset to first page when searching
-  renderGallery();
+  changePage(1);
 }
