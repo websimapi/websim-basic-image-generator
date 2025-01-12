@@ -17,39 +17,6 @@ async function initGallery() {
   renderGallery();
 }
 
-async function loadGalleryImage(id) {
-  const image = galleryImages.find(img => img.id === id);
-  if (!image) return;
-  
-  // Increment both views and uses
-  await room.collection('gallery_images').update(id, {
-    views: (image.views || 0) + 1,
-    uses: (image.uses || 0) + 1
-  });
-
-  const imageContainer = document.getElementById('imageContainer');
-  const existingImages = imageContainer.querySelectorAll('img');
-  existingImages.forEach(img => img.remove());
-  
-  const generatedImage = document.createElement('img');
-  generatedImage.id = `generatedImage_${imageCounter++}`;
-  generatedImage.className = 'generated-image';
-  generatedImage.style.display = 'none';
-  generatedImage.crossOrigin = 'anonymous';
-  generatedImage.src = image.imageUrl;
-  generatedImage.alt = image.prompt;
-  
-  imageContainer.appendChild(generatedImage);
-  currentImage = generatedImage;
-  
-  document.getElementById('saveButton').style.display = 'block';
-  document.getElementById('addGalleryButton').style.display = 'block';
-  
-  currentImage.onload = function () {
-    setupImageEditor();
-  };
-}
-
 function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
@@ -95,12 +62,7 @@ function renderGallery() {
 
   galleryEl.innerHTML = pageImages.map(img => `
     <div class="gallery-item">
-      <img 
-        src="${img.imageUrl}" 
-        alt="${img.prompt}" 
-        onclick="loadGalleryImage('${img.id}')"
-        onload="incrementViews('${img.id}')"
-      >
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
         <div>${img.prompt}</div>
         <div>by ${img.username}</div>
@@ -120,30 +82,6 @@ function renderGallery() {
   `).join('');
 }
 
-async function incrementViews(id) {
-  const image = galleryImages.find(img => img.id === id);
-  if (!image) return;
-
-  // We don't want to increment views too frequently for the same image
-  // So we'll use a Set to track which images we've already counted views for
-  if (!window.viewedImages) {
-    window.viewedImages = new Set();
-  }
-
-  // Only increment if we haven't counted this view yet
-  if (!window.viewedImages.has(id)) {
-    await room.collection('gallery_images').update(id, {
-      views: (image.views || 0) + 1
-    });
-    window.viewedImages.add(id);
-
-    // Clear the viewed status after some time (e.g., 5 minutes)
-    setTimeout(() => {
-      window.viewedImages.delete(id);
-    }, 5 * 60 * 1000);
-  }
-}
-
 async function showGalleryTab(tab) {
   currentTab = tab;
   currentPage = 1; // Reset to first page when changing tabs
@@ -151,6 +89,37 @@ async function showGalleryTab(tab) {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
   renderGallery();
+}
+
+async function loadGalleryImage(id) {
+  const image = galleryImages.find(img => img.id === id);
+  if (!image) return;
+  
+  await room.collection('gallery_images').update(id, {
+    views: (image.views || 0) + 1
+  });
+
+  const imageContainer = document.getElementById('imageContainer');
+  const existingImages = imageContainer.querySelectorAll('img');
+  existingImages.forEach(img => img.remove());
+  
+  const generatedImage = document.createElement('img');
+  generatedImage.id = `generatedImage_${imageCounter++}`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
+  generatedImage.src = image.imageUrl;
+  generatedImage.alt = image.prompt;
+  
+  imageContainer.appendChild(generatedImage);
+  currentImage = generatedImage;
+  
+  document.getElementById('saveButton').style.display = 'block';
+  document.getElementById('addGalleryButton').style.display = 'block';
+  
+  currentImage.onload = function () {
+    setupImageEditor();
+  };
 }
 
 function editImage(id) {
