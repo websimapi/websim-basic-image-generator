@@ -121,7 +121,8 @@ async function loadGalleryImage(id) {
         timestamp: new Date().toISOString(),
         usedImageId: image.id,
         usedImageTitle: image.title || 'Untitled',
-        username: room.party.client.username
+        username: image.username,
+        sourceUsername: room.party.client.username
       });
 
       // Update the prompt history in the database
@@ -152,24 +153,27 @@ function renderGalleryItem(img) {
     
     switch(entry.type) {
       case 'original':
-        entryHtml = `<strong>Original:</strong> ${entry.prompt}`;
+        entryHtml = `<strong>Original:</strong> ${entry.prompt} <span class="history-username">by ${entry.username || img.username}</span>`;
         break;
       case 'selection':
-        entryHtml = `<strong>Selection Fill:</strong> ${entry.prompt}`;
+        entryHtml = `<strong>Selection Fill:</strong> ${entry.prompt} <span class="history-username">by ${entry.username || img.username}</span>`;
         break;
       case 'used_image':
-        entryHtml = `<strong>Used Image:</strong> "${entry.usedImageTitle}" with prompt: ${entry.prompt}`;
+        entryHtml = `
+          <strong>Used Image:</strong> "${entry.usedImageTitle}" 
+          <span class="history-username">originally by ${entry.username}</span>
+          with prompt: ${entry.prompt}
+          <span class="history-username">used by ${entry.sourceUsername}</span>
+        `;
         break;
       default:
-        entryHtml = entry.prompt;
+        entryHtml = `${entry.prompt} <span class="history-username">by ${entry.username || img.username}</span>`;
     }
     
     return `
       <li>
         ${entryHtml}
-        <span class="prompt-date">
-          by ${entry.username} on ${new Date(entry.timestamp).toLocaleString()}
-        </span>
+        <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
       </li>
     `;
   }).join('');
@@ -429,18 +433,11 @@ async function addToGallery() {
     
     // Add to gallery with the uploaded URL
     await room.collection('gallery_images').create({
-      title: promptInput.value.trim().substring(0, 50),
       prompt: fullPrompt,
       imageUrl: imageUrl,
       views: 0,
       uses: 0,
-      modified: true, 
-      promptHistory: [{
-        type: 'original',
-        prompt: fullPrompt,
-        timestamp: new Date().toISOString(),
-        username: room.party.client.username
-      }]
+      modified: true // Flag to indicate this was edited
     });
     
     alert('Image added to gallery successfully!');
@@ -504,18 +501,18 @@ function generateImage() {
       try {
         // Add to gallery with the final generation URL
         await room.collection('gallery_images').create({
-          title: promptInput.value.trim().substring(0, 50),
           prompt: fullPrompt,
-          imageUrl: generatedImage.src,
+          imageUrl: generatedImage.src, // Use the final URL directly
           views: 0,
           uses: 0,
-          modified: false,
-          promptHistory: [{
-            type: 'original',
-            prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            username: room.party.client.username
-          }]
+          modified: false
+        });
+        
+        // Save prompt history
+        promptHistory.push({
+          type: 'original',
+          prompt: fullPrompt,
+          timestamp: new Date().toISOString()
         });
         
         setupImageEditor();
@@ -664,8 +661,7 @@ function generateSelectionFill() {
       type: 'selection',
       prompt: prompt,
       timestamp: new Date().toISOString(),
-      parentId: currentImage ? currentImage.id : null,
-      username: room.party.client.username
+      parentId: generatedImage.alt
     });
 
     // Cleanup

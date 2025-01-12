@@ -1,0 +1,28 @@
+// Add to styles.css:
+
+.history-username {
+  font-style: italic;
+  color: rgba(255,255,255,0.7);
+  margin-left: 0.5rem;
+}
+
+.prompt-history ol {
+  padding-left: 1.2rem;
+}
+
+.prompt-history li {
+  margin-bottom: 1rem;
+  border-left: 2px solid rgba(255,255,255,0.1);
+  padding-left: 1rem;
+}
+
+.prompt-history strong {
+  color: #2196F3;
+}
+
+.prompt-date {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 0.3rem;
+}
