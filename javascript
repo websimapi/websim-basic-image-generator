@@ -31,7 +31,8 @@ function renderGallery() {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
       img.prompt.toLowerCase().includes(searchLower) || 
-      img.username.toLowerCase().includes(searchLower)
+      img.username.toLowerCase().includes(searchLower) ||
+      (img.title && img.title.toLowerCase().includes(searchLower))
     );
   }
 
@@ -62,7 +63,56 @@ function renderGallery() {
     return;
   }
 
-  galleryEl.innerHTML = paginatedImages.map(img => renderGalleryItem(img)).join('');
+  galleryEl.innerHTML = paginatedImages.map(img => `
+    <div class="gallery-item">
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div class="metadata">
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
+        <div class="creator">by <img src="https://images.websim.ai/avatar/${img.username}" class="avatar" alt="${img.username}"> ${img.username}</div>
+        <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <div class="prompt-history">
+          <details>
+            <summary>Prompt History</summary>
+            <ol>
+              ${(img.promptHistory || []).map((entry, i) => `
+                <li class="history-entry ${entry.type}">
+                  <div class="entry-header">
+                    <span class="entry-type">${entry.type === 'original' ? 'Original' : 'Selection Fill'}</span>
+                    <span class="entry-user">
+                      <img src="https://images.websim.ai/avatar/${entry.username}" class="avatar" alt="${entry.username}">
+                      ${entry.username}
+                    </span>
+                    <span class="entry-date">${new Date(entry.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div class="entry-prompt">${entry.prompt}</div>
+                  ${entry.parentId ? `
+                    <div class="entry-parent">
+                      <a href="#" onclick="loadGalleryImage('${entry.parentId}'); return false;">
+                        View Original Image
+                      </a>
+                    </div>
+                  ` : ''}
+                </li>
+              `).join('')}
+            </ol>
+          </details>
+        </div>
+      </div>
+      <div class="stats">
+        <span>${img.views || 0} views</span>
+        <span>${img.uses || 0} uses</span>
+      </div>
+      ${img.username === room.party.client.username ? `
+        <div class="gallery-item-controls">
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
@@ -84,18 +134,12 @@ function changePage(delta) {
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
-  
-  // Update both views and uses counters
   await room.collection('gallery_images').update(id, {
-    views: (image.views || 0) + 1,
-    uses: (image.uses || 0) + 1
+    views: (image.views || 0) + 1
   });
-  
-  // Load the image
   const imageContainer = document.getElementById('imageContainer');
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
-  
   const generatedImage = document.createElement('img');
   generatedImage.id = `generatedImage_${Date.now()}`;
   generatedImage.className = 'generated-image';
@@ -103,107 +147,13 @@ async function loadGalleryImage(id) {
   generatedImage.crossOrigin = 'anonymous';
   generatedImage.src = image.imageUrl;
   generatedImage.alt = image.prompt;
-
-  // Add this use to prompt history if we load this into an existing editor session
-  if (currentImage) {
-    const parentImage = galleryImages.find(img => img.imageUrl === currentImage.src);
-    if (parentImage) {
-      const promptHistory = [...(parentImage.promptHistory || [])];
-      
-      // Get the most recent prompt from the used image
-      const latestPrompt = image.promptHistory && image.promptHistory.length > 0 
-        ? image.promptHistory[image.promptHistory.length - 1].prompt 
-        : image.prompt;
-
-      promptHistory.push({
-        type: 'used_image',
-        prompt: latestPrompt,
-        timestamp: new Date().toISOString(),
-        usedImageId: image.id,
-        usedImageTitle: image.title || 'Untitled',
-        username: room.party.client.username,
-        sourceUsername: image.username
-      });
-
-      // Update the prompt history in the database
-      try {
-        await room.collection('gallery_images').update(parentImage.id, {
-          promptHistory
-        });
-      } catch (error) {
-        console.error('Error updating prompt history:', error);
-      }
-    }
-  }
-
   imageContainer.appendChild(generatedImage);
   currentImage = generatedImage;
-  
   document.getElementById('saveButton').style.display = 'block';
   document.getElementById('addGalleryButton').style.display = 'block';
-  
   currentImage.onload = function () {
     setupImageEditor();
   };
-}
-
-function renderGalleryItem(img) {
-  const promptHistoryHtml = (img.promptHistory || []).map((entry, i) => {
-    let entryHtml = '';
-    
-    switch(entry.type) {
-      case 'original':
-        entryHtml = `<strong>Original by ${entry.username}:</strong> ${entry.prompt}`;
-        break;
-      case 'selection':
-        entryHtml = `<strong>Selection Fill by ${entry.username}:</strong> ${entry.prompt}`;
-        break;
-      case 'used_image':
-        entryHtml = `<strong>Used Image by ${entry.username}:</strong> Used "${entry.usedImageTitle}" (by ${entry.sourceUsername}) with prompt: ${entry.prompt}`;
-        break;
-      default:
-        entryHtml = `<strong>By ${entry.username}:</strong> ${entry.prompt}`;
-    }
-    
-    return `
-      <li>
-        ${entryHtml}
-        <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
-      </li>
-    `;
-  }).join('');
-
-  return `
-    <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
-      <div class="metadata">
-        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
-          ${img.title || 'Untitled'} 
-          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
-        </div>
-        <div>by ${img.username}</div>
-        <div>${new Date(img.created_at).toLocaleDateString()}</div>
-        <div class="prompt-history">
-          <details>
-            <summary>Prompt History</summary>
-            <ol>
-              ${promptHistoryHtml}
-            </ol>
-          </details>
-        </div>
-      </div>
-      <div class="stats">
-        <span>${img.views || 0} views</span>
-        <span>${img.uses || 0} uses</span>
-      </div>
-      ${img.username === room.party.client.username ? `
-        <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
-          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
-        </div>
-      ` : ''}
-    </div>
-  `;
 }
 
 function setupImageEditor() {
@@ -428,11 +378,19 @@ async function addToGallery() {
     
     // Add to gallery with the uploaded URL
     await room.collection('gallery_images').create({
+      title: promptInput.value.trim().substring(0, 50),
       prompt: fullPrompt,
       imageUrl: imageUrl,
       views: 0,
       uses: 0,
-      modified: true // Flag to indicate this was edited
+      modified: true, 
+      promptHistory: [{
+        type: 'original',
+        prompt: fullPrompt,
+        timestamp: new Date().toISOString(),
+        username: room.party.client.username,
+        avatarUrl: room.party.client.avatarUrl
+      }]
     });
     
     alert('Image added to gallery successfully!');
@@ -480,42 +438,46 @@ function generateImage() {
   generatedImage.src = fullPrompt;
   generatedImage.alt = fullPrompt;
 
-  // Track initial source to detect when generation is complete
-  const initialSrc = generatedImage.src;
-  
+  // When image loads (generation complete)
   generatedImage.onload = async function() {
     // Check if the src has changed (meaning generation is complete)
-    if (generatedImage.src !== initialSrc) {
-      loadingSpinner.style.display = 'none';
-      generatedImage.style.display = 'block';
-      placeholderText.style.display = 'none';
-      saveButton.style.display = 'block';
-      addGalleryButton.style.display = 'block';
-      currentImage = generatedImage;
+    const parentImage = {
+      promptHistory: [],
+      id: generatedImage.id
+    };
+    const promptHistory = parentImage ? [...(parentImage.promptHistory || [])] : [];
+    promptHistory.push({
+      type: 'original',
+      prompt: fullPrompt,
+      timestamp: new Date().toISOString(),
+      username: room.party.client.username,
+      avatarUrl: room.party.client.avatarUrl
+    });
+
+    loadingSpinner.style.display = 'none';
+    generatedImage.style.display = 'block';
+    placeholderText.style.display = 'none';
+    saveButton.style.display = 'block';
+    addGalleryButton.style.display = 'block';
+    currentImage = generatedImage;
+    
+    try {
+      // Add to gallery with the final generation URL
+      await room.collection('gallery_images').create({
+        title: promptInput.value.trim().substring(0, 50),
+        prompt: fullPrompt,
+        imageUrl: generatedImage.src, 
+        views: 0,
+        uses: 0,
+        modified: false,
+        promptHistory: promptHistory
+      });
       
-      try {
-        // Add to gallery with the final generation URL
-        await room.collection('gallery_images').create({
-          title: promptInput.value.trim().substring(0, 50),
-          prompt: fullPrompt,
-          imageUrl: generatedImage.src,
-          views: 0,
-          uses: 0,
-          modified: false,
-          promptHistory: [{
-            type: 'original',
-            prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            username: room.party.client.username
-          }]
-        });
-        
-        setupImageEditor();
-        
-      } catch (error) {
-        console.error('Error processing generated image:', error);
-        alert('Failed to process generated image. Please try again.');
-      }
+      setupImageEditor();
+      
+    } catch (error) {
+      console.error('Error processing generated image:', error);
+      alert('Failed to process generated image. Please try again.');
     }
   };
 
@@ -569,6 +531,15 @@ function generateSelectionFill() {
   const suffixSelect = document.getElementById('suffixPrompt');
   const fullPrompt = `${prefixSelect.value}${prompt}${suffixSelect.value}`;
 
+  // Get the parent image
+  let parentImage = null;
+  if (currentImage && currentImage.id) {
+    const image = galleryImages.find(img => img.imageUrl === currentImage.src);
+    if (image) {
+      parentImage = image;
+    }
+  }
+
   // Show loading state
   const loadingSpinner = document.getElementById('loadingSpinner');
   loadingSpinner.style.display = 'block';
@@ -585,7 +556,7 @@ function generateSelectionFill() {
   generatedImage.alt = fullPrompt;
 
   // When image loads (generation complete)
-  generatedImage.onload = function() {
+  generatedImage.onload = async function() {
     loadingSpinner.style.display = 'none';
     
     const canvas = document.getElementById('editCanvas');
@@ -651,14 +622,22 @@ function generateSelectionFill() {
     originalImageData = imageData;
 
     // Save prompt history
-    const parentImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+    const promptHistory = parentImage ? [...(parentImage.promptHistory || [])] : [];
     promptHistory.push({
       type: 'selection',
       prompt: fullPrompt,
       timestamp: new Date().toISOString(),
-      parentId: parentImage ? parentImage.id : null,
-      username: room.party.client.username
+      username: room.party.client.username,
+      avatarUrl: room.party.client.avatarUrl,
+      parentId: parentImage ? parentImage.id : null
     });
+
+    // Update the parent image with new prompt history
+    if (parentImage) {
+      await room.collection('gallery_images').update(parentImage.id, {
+        promptHistory: promptHistory
+      });
+    }
 
     // Cleanup
     document.getElementById('fillImagePrompt').style.display = 'none';
@@ -679,37 +658,37 @@ document.addEventListener('keyup', function (e) {
   if (!e.ctrlKey) isCtrlPressed = false;
 });
 
-function editImage(id) {
+function editTitle(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
-  const dialog = document.getElementById('editPromptDialog');
+  const dialog = document.getElementById('editTitleDialog');
   const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editPromptInput');
-  input.value = image.prompt;
+  const input = document.getElementById('editTitleInput');
+  input.value = image.title || '';
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
 
 async function saveEdit() {
   if (!currentEditId) return;
-  const input = document.getElementById('editPromptInput');
-  const newPrompt = input.value.trim();
-  if (!newPrompt) {
-    alert('Please enter a prompt');
+  const input = document.getElementById('editTitleInput');
+  const newTitle = input.value.trim();
+  if (!newTitle) {
+    alert('Please enter a title');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    prompt: newPrompt
+    title: newTitle
   });
   cancelEdit();
 }
 
 function cancelEdit() {
   currentEditId = null;
-  const dialog = document.getElementById('editPromptDialog');
+  const dialog = document.getElementById('editTitleDialog');
   const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editPromptInput');
+  const input = document.getElementById('editTitleInput');
   input.value = '';
   dialog.style.display = 'none';
   overlay.style.display = 'none';
