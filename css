@@ -1,14 +1,19 @@
-.gallery-item .gallery-image {
+.gallery-image {
   width: 100%;
   height: 200px;
-  border-radius: 4px;
-  cursor: pointer;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  border-radius: 4px;
+  cursor: pointer;
   transition: transform 0.2s ease-in-out;
 }
 
-.gallery-item .gallery-image:hover {
+.gallery-image:hover {
   transform: scale(1.02);
+}
+
+/* Remove the old img styles */
+.gallery-item img {
+  display: none;
 }
