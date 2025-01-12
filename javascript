@@ -62,26 +62,7 @@ function renderGallery() {
     return;
   }
 
-  galleryEl.innerHTML = paginatedImages.map(img => `
-    <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
-      <div class="metadata">
-        <div>${img.prompt}</div>
-        <div>by ${img.username}</div>
-        <div>${new Date(img.created_at).toLocaleDateString()}</div>
-      </div>
-      <div class="stats">
-        <span>${img.views || 0} views</span>
-        <span>${img.uses || 0} uses</span>
-      </div>
-      ${img.username === room.party.client.username ? `
-        <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
-          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
+  galleryEl.innerHTML = paginatedImages.map(img => renderGalleryItem(img)).join('');
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
@@ -103,12 +84,18 @@ function changePage(delta) {
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
+  
+  // Update both views and uses counters
   await room.collection('gallery_images').update(id, {
-    views: (image.views || 0) + 1
+    views: (image.views || 0) + 1,
+    uses: (image.uses || 0) + 1
   });
+  
+  // Load the image
   const imageContainer = document.getElementById('imageContainer');
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
+  
   const generatedImage = document.createElement('img');
   generatedImage.id = `generatedImage_${Date.now()}`;
   generatedImage.className = 'generated-image';
@@ -116,13 +103,105 @@ async function loadGalleryImage(id) {
   generatedImage.crossOrigin = 'anonymous';
   generatedImage.src = image.imageUrl;
   generatedImage.alt = image.prompt;
+
+  // Add this use to prompt history if we load this into an existing editor session
+  if (currentImage) {
+    const parentImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+    if (parentImage) {
+      const promptHistory = [...(parentImage.promptHistory || [])];
+      
+      // Get the most recent prompt from the used image
+      const latestPrompt = image.promptHistory && image.promptHistory.length > 0 
+        ? image.promptHistory[image.promptHistory.length - 1].prompt 
+        : image.prompt;
+
+      promptHistory.push({
+        type: 'used_image',
+        prompt: latestPrompt,
+        timestamp: new Date().toISOString(),
+        usedImageId: image.id,
+        usedImageTitle: image.title || 'Untitled'
+      });
+
+      // Update the prompt history in the database
+      try {
+        await room.collection('gallery_images').update(parentImage.id, {
+          promptHistory
+        });
+      } catch (error) {
+        console.error('Error updating prompt history:', error);
+      }
+    }
+  }
+
   imageContainer.appendChild(generatedImage);
   currentImage = generatedImage;
+  
   document.getElementById('saveButton').style.display = 'block';
   document.getElementById('addGalleryButton').style.display = 'block';
+  
   currentImage.onload = function () {
     setupImageEditor();
   };
+}
+
+function renderGalleryItem(img) {
+  const promptHistoryHtml = (img.promptHistory || []).map((entry, i) => {
+    let entryHtml = '';
+    
+    switch(entry.type) {
+      case 'original':
+        entryHtml = `<strong>Original:</strong> ${entry.prompt}`;
+        break;
+      case 'selection':
+        entryHtml = `<strong>Selection Fill:</strong> ${entry.prompt}`;
+        break;
+      case 'used_image':
+        entryHtml = `<strong>Used Image:</strong> "${entry.usedImageTitle}" with prompt: ${entry.prompt}`;
+        break;
+      default:
+        entryHtml = entry.prompt;
+    }
+    
+    return `
+      <li>
+        ${entryHtml}
+        <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+      </li>
+    `;
+  }).join('');
+
+  return `
+    <div class="gallery-item">
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div class="metadata">
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
+        <div>by ${img.username}</div>
+        <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <div class="prompt-history">
+          <details>
+            <summary>Prompt History</summary>
+            <ol>
+              ${promptHistoryHtml}
+            </ol>
+          </details>
+        </div>
+      </div>
+      <div class="stats">
+        <span>${img.views || 0} views</span>
+        <span>${img.uses || 0} uses</span>
+      </div>
+      ${img.username === room.party.client.username ? `
+        <div class="gallery-item-controls">
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
 }
 
 function setupImageEditor() {
