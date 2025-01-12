@@ -259,77 +259,31 @@ button:hover {
   background: #9c27b0;
 }
 
-/* Layer Controls */
-.layer-controls {
+/* Canvas Container */
+.canvas-container {
+  position: relative;
+  margin-top: 2rem;
+  padding: 1rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding: 0.5rem;
-  background: rgba(255,255,255,0.05);
-  border-radius: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.layer-item {
-  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
+  justify-content: center;
 }
 
-.layer-preview {
-  width: 50px;
-  height: 50px;
-  background: rgba(0,0,0,0.2);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.layer-preview canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.layer-visibility {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.layer-visibility input {
-  display: none;
-}
-
-.checkbox-custom {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255,255,255,0.6);
-  border-radius: 4px;
-  position: relative;
-}
-
-.layer-visibility input:checked + .checkbox-custom::after {
-  content: '';
+.editor-canvas {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 5px;
   position: absolute;
-  left: 6px;
-  top: 2px;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  top: 0;
+  left: 0;
 }
 
-.layer-item span {
-  color: rgba(255,255,255,0.8);
-  font-size: 0.9rem;
+.editor-canvas.magic-wand {
+  cursor: crosshair;
 }
 
 /* Responsive Design */
@@ -352,5 +306,9 @@ button:hover {
 
   .tool-group {
     gap: 0.5rem;
+  }
+
+  .editor-canvas {
+    max-height: 400px;
   }
 }
