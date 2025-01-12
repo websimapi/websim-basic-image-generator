@@ -1,77 +1,12 @@
-.history-entry {
-  background: rgba(255,255,255,0.05);
-  border-radius: 6px;
-  padding: 12px;
-  margin: 8px 0;
-}
-
-.entry-header {
+.prompt-metadata {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.entry-type {
-  background: rgba(255,255,255,0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.8em;
-}
-
-.entry-user {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.entry-date {
+  gap: 1rem;
+  font-size: 0.8rem;
   color: rgba(255,255,255,0.6);
-  font-size: 0.8em;
-  margin-left: auto;
+  margin-top: 0.2rem;
 }
 
-.entry-prompt {
-  color: rgba(255,255,255,0.9);
-  font-family: monospace;
-  background: rgba(0,0,0,0.2);
-  padding: 8px;
-  border-radius: 4px;
-  margin: 4px 0;
-}
-
-.entry-parent {
-  margin-top: 8px;
-}
-
-.entry-parent a {
-  color: #2196F3;
-  text-decoration: none;
-  font-size: 0.9em;
-}
-
-.entry-parent a:hover {
-  text-decoration: underline;
-}
-
-.avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.history-entry.original {
-  border-left: 3px solid #4CAF50;
-}
-
-.history-entry.selection {
-  border-left: 3px solid #2196F3;
-}
-
-.creator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0;
+.prompt-user {
+  font-weight: bold;
+  color: rgba(255,255,255,0.8);
 }
