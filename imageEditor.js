@@ -6,9 +6,39 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
-let currentTool = null;
-let colorThreshold = 32;
-let lastClickX, lastClickY;
+
+// Add history stack for tracking changes 
+let imageHistory = [];
+let currentHistoryIndex = -1;
+
+function saveToHistory() {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  // Remove any redo states
+  imageHistory = imageHistory.slice(0, currentHistoryIndex + 1);
+  
+  // Add new state
+  imageHistory.push(imageData);
+  currentHistoryIndex++;
+  
+  // Limit history size
+  if (imageHistory.length > 20) {
+    imageHistory.shift();
+    currentHistoryIndex--;
+  }
+}
+
+function undo() {
+  if (currentHistoryIndex > 0) {
+    currentHistoryIndex--;
+    const canvas = document.getElementById('editCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(imageHistory[currentHistoryIndex], 0, 0);
+    originalImageData = imageHistory[currentHistoryIndex];
+  }
+}
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -26,6 +56,11 @@ function setupImageEditor() {
     canvas.height = currentImage.naturalHeight;
     ctx.drawImage(currentImage, 0, 0);
     originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Initialize history with original state
+    imageHistory = [originalImageData];
+    currentHistoryIndex = 0;
+    
     currentImage.style.display = 'none';
     canvas.style.display = 'block';
     editorControls.style.display = 'flex';
@@ -43,23 +78,18 @@ function setupImageEditor() {
 }
 
 function handleCanvasClick(e) {
-  if (currentTool !== 'magicWand') return;
-  
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (canvas.width / rect.width);
   const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-  
-  lastClickX = Math.round(x);
-  lastClickY = Math.round(y);
-  
+
   if (!isShiftPressed && !isCtrlPressed) {
     currentSelection = null;
   }
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newSelection = magicWandSelect(imageData, lastClickX, lastClickY, colorThreshold);
+  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
 
   if (isShiftPressed || isCtrlPressed) {
     if (currentSelection) {
@@ -161,9 +191,6 @@ function drawSelectionOverlay() {
 function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
-  const thresholdSlider = document.getElementById('thresholdSlider');
-  
-  currentTool = tool;
   
   document.querySelectorAll('.tool-button').forEach(btn => 
     btn.classList.remove('active')
@@ -173,9 +200,6 @@ function setTool(tool) {
   if (toolButton) {
     toolButton.classList.add('active');
   }
-
-  // Show/hide threshold slider for magic wand tool
-  thresholdSlider.classList.toggle('visible', tool === 'magicWand');
 
   switch (tool) {
     case 'fillSelection':
@@ -193,6 +217,11 @@ function setTool(tool) {
     case 'fillWithImage':
       if (currentSelection) {
         fillImagePrompt.style.display = 'flex';
+      }
+      break;
+    case 'clearSelection':
+      if (currentSelection) {
+        clearSelectionContent();
       }
       break;
     default:
@@ -226,6 +255,8 @@ function fillSelection() {
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
+  
+  saveToHistory();
 }
 
 function setSelectionAlpha() {
@@ -245,6 +276,8 @@ function setSelectionAlpha() {
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
+  
+  saveToHistory();
 }
 
 function clearSelection() {
@@ -261,30 +294,28 @@ function resetImage() {
   currentSelection = null;
 }
 
-function setupEditorControls() {
-  const thresholdInput = document.getElementById('colorThreshold');
-  const thresholdValue = document.getElementById('thresholdValue');
-  
-  thresholdInput.addEventListener('input', function(e) {
-    colorThreshold = parseInt(e.target.value);
-    thresholdValue.textContent = colorThreshold;
-    
-    // If there's an active selection, update it with the new threshold
-    if (currentSelection && currentTool === 'magicWand') {
-      const canvas = document.getElementById('editCanvas');
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Find the last clicked position 
-      if (lastClickX !== undefined && lastClickY !== undefined) {
-        currentSelection = magicWandSelect(imageData, lastClickX, lastClickY, colorThreshold);
-        drawSelectionOverlay();
-      }
-    }
-  });
-}
+function clearSelectionContent() {
+  if (!currentSelection) {
+    alert('Please make a selection first');
+    return;
+  }
 
-window.addEventListener('load', () => {
-  setupEditorControls();
-  setupImageEditor();
-});
+  // Save current state before making changes
+  saveToHistory();
+
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+
+  // Set alpha to 0 for selected pixels
+  for (let i = 0; i < currentSelection.length; i++) {
+    if (currentSelection[i]) {
+      const pixelPos = i * 4;
+      pixels[pixelPos + 3] = 0; // Set alpha to 0
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  originalImageData = imageData;
+}
