@@ -860,26 +860,56 @@
       const prefixSelect = document.getElementById('prefixPrompt');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-      
+  
       try {
-        // Convert canvas to blob
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png');
-        });
+        const ctx = canvas.getContext('2d');
+        const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const currentHash = generateImageHash(currentImageData);
         
-        // Create a File object from the blob
-        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+        const duplicates = await Promise.all(galleryImages.map(async img => {
+          const tempImg = new Image();
+          tempImg.src = img.imageUrl;
+          
+          return new Promise((resolve) => {
+            tempImg.onload = () => {
+              const tempCanvas = document.createElement('canvas');
+              const tempCtx = tempCanvas.getContext('2d');
+              tempCanvas.width = tempImg.width;
+              tempCanvas.height = tempImg.height;
+              tempCtx.drawImage(tempImg, 0, 0);
+              const tempImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+              const tempHash = generateImageHash(tempImageData);
+              resolve(tempHash === currentHash);
+            };
+          });
+        }));
         
-        // Upload the file and get the URL
-        const imageUrl = await websim.upload(file);
+        const duplicateImages = galleryImages.filter((img, index) => duplicates[index]);
         
-        // Add to gallery with the uploaded URL
+        for (const duplicate of duplicateImages) {
+          await room.collection('gallery_images').delete(duplicate.id);
+        }
+        
+        let imageUrl;
+        
+        if (hasImageBeenModified() || originalImageData === null) {
+          const blob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/png');
+          });
+          
+          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+          
+          imageUrl = await websim.upload(file);
+        } else {
+          imageUrl = currentImage.src;
+        }
+        
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           imageUrl: imageUrl,
           views: 0,
           uses: 0,
-          modified: true // Flag to indicate this was edited
+          modified: hasImageBeenModified()
         });
         
         alert('Image added to gallery successfully!');
@@ -913,7 +943,6 @@
       saveButton.style.display = 'none';
       addGalleryButton.style.display = 'none';
 
-      // Clear existing images
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
 
@@ -934,19 +963,12 @@
         currentImage = generatedImage;
         
         try {
-          // Convert image to blob and upload
-          const response = await fetch(generatedImage.src);
-          const blob = await response.blob();
-          const file = new File([blob], 'generated-image.png', { type: 'image/png' });
-          const imageUrl = await websim.upload(file);
-          
-          // Add to gallery with uploaded URL
           await room.collection('gallery_images').create({
             prompt: fullPrompt,
-            imageUrl: imageUrl,
+            imageUrl: generatedImage.src,
             views: 0,
             uses: 0,
-            modified: false // Flag to indicate this was not edited
+            modified: false
           });
           
           setupImageEditor();
@@ -964,10 +986,8 @@
       const file = event.target.files[0];
       if (file) {
         try {
-          // Upload the file directly
           const imageUrl = await websim.upload(file);
           
-          // Create temporary image to get dimensions
           const uploadedImage = new Image();
           uploadedImage.onload = function() {
             currentImage = uploadedImage;
@@ -975,13 +995,13 @@
           };
           uploadedImage.src = URL.createObjectURL(file);
           
-          // Add to gallery with uploaded URL
           await room.collection('gallery_images').create({
             imageUrl: imageUrl,
             prompt: file.name,
             views: 0,
             uses: 0,
-            modified: false
+            modified: false,
+            isCustomUpload: true
           });
           
         } catch (error) {
@@ -991,111 +1011,26 @@
       }
     }
 
-    function generateSelectionFill() {
-      if (!currentSelection) {
-        alert('Please make a selection first');
-        return;
+    function generateImageHash(imageData) {
+      const pixels = imageData.data;
+      let hash = '';
+      for (let i = 0; i < pixels.length; i += 4) {
+        hash += pixels[i].toString(16).padStart(2, '0') + pixels[i + 1].toString(16).padStart(2, '0') + pixels[i + 2].toString(16).padStart(2, '0');
       }
-      
-      const prompt = document.getElementById('selectionPromptInput').value.trim();
-      if (!prompt) {
-        alert('Please enter a prompt for the selected region');
-        return;
+      return hash;
+    }
+
+    function hasImageBeenModified() {
+      if (!originalImageData) return true;
+      const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
+      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const originalPixels = originalImageData.data;
+      const currentPixels = currentImageData.data;
+      for (let i = 0; i < originalPixels.length; i++) {
+        if (originalPixels[i] !== currentPixels[i]) return true;
       }
-
-      // Get prefix and suffix like main generation
-      const prefixSelect = document.getElementById('prefixPrompt');
-      const suffixSelect = document.getElementById('suffixPrompt');
-      const fullPrompt = `${prefixSelect.value}${prompt}${suffixSelect.value}`;
-
-      // Show loading state
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      loadingSpinner.style.display = 'block';
-
-      // Create new image element for generation
-      const generatedImage = document.createElement('img');
-      const tempId = `fillImage_${Date.now()}`;
-      generatedImage.id = tempId;
-      generatedImage.crossOrigin = 'anonymous';
-      generatedImage.style.display = 'none';
-      
-      // Set proper src and alt
-      generatedImage.src = fullPrompt;
-      generatedImage.alt = fullPrompt;
-
-      // When image loads (generation complete)
-      generatedImage.onload = function() {
-        loadingSpinner.style.display = 'none';
-        
-        const canvas = document.getElementById('editCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Find selection bounds
-        let minX = canvas.width;
-        let minY = canvas.height;
-        let maxX = 0;
-        let maxY = 0;
-
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              minX = Math.min(minX, x);
-              minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x);
-              maxY = Math.max(maxY, y);
-            }
-          }
-        }
-
-        // Create temporary canvas for scaling generated image
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        const selectionWidth = maxX - minX + 1;
-        const selectionHeight = maxY - minY + 1;
-        
-        tempCanvas.width = selectionWidth;
-        tempCanvas.height = selectionHeight;
-        
-        // Draw and scale generated image to selection size
-        tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
-        
-        // Get scaled image data
-        const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
-        
-        // Get current canvas image data
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        // Apply generated image to selection area
-        for (let y = minY; y <= maxY; y++) {
-          for (let x = minX; x <= maxX; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              const scaledX = x - minX;
-              const scaledY = y - minY;
-              const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
-              const targetPos = pos * 4;
-              
-              pixels[targetPos] = scaledImageData.data[scaledPos];
-              pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
-              pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
-              pixels[targetPos + 3] = scaledImageData.data[scaledPos + 3];
-            }
-          }
-        }
-
-        // Update canvas with new image data
-        ctx.putImageData(imageData, 0, 0);
-        originalImageData = imageData;
-
-        // Cleanup
-        document.getElementById('fillImagePrompt').style.display = 'none';
-        generatedImage.remove();
-      };
-
-      // Add image to document (hidden) to begin generation
-      document.body.appendChild(generatedImage);
+      return false;
     }
 
     document.addEventListener('keydown', function (e) {

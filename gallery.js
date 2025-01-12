@@ -3,8 +3,6 @@ let galleryImages = [];
 let currentTab = 'recent';
 let currentEditId = null;
 let currentSearch = '';
-let currentPage = 1;
-const ITEMS_PER_PAGE = 10;
 let imageCounter = 0;
 let currentImage = null;
 
@@ -12,7 +10,6 @@ async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
     galleryImages = images;
-    currentPage = 1; // Reset to first page when data updates
     renderGallery();
   });
   renderGallery();
@@ -22,7 +19,6 @@ function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
   
-  // Apply filters
   if (currentSearch) {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
@@ -31,7 +27,6 @@ function renderGallery() {
     );
   }
 
-  // Apply sorting based on current tab
   switch (currentTab) {
     case 'popular':
       images.sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -43,12 +38,6 @@ function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedImages = images.slice(startIndex, endIndex);
-
   if (images.length === 0) {
     galleryEl.innerHTML = `
       <div class="no-results">
@@ -58,89 +47,26 @@ function renderGallery() {
     return;
   }
 
-  // Render gallery items
-  galleryEl.innerHTML = `
-    <div class="gallery-grid">
-      ${paginatedImages.map(img => `
-        <div class="gallery-item">
-          <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
-          <div class="metadata">
-            <div>${img.prompt}</div>
-            <div>by ${img.username}</div>
-            <div>${new Date(img.created_at).toLocaleDateString()}</div>
-          </div>
-          <div class="stats">
-            <span>${img.views || 0} views</span>
-            <span>${img.uses || 0} uses</span>
-          </div>
-          ${img.username === room.party.client.username ? `
-            <div class="gallery-item-controls">
-              <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
-              <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
-            </div>
-          ` : ''}
-        </div>
-      `).join('')}
-    </div>
-    
-    ${totalPages > 1 ? `
-      <div class="pagination">
-        ${currentPage > 1 ? `
-          <button onclick="changePage(1)" class="page-button">«</button>
-          <button onclick="changePage(${currentPage - 1})" class="page-button">‹</button>
-        ` : ''}
-        
-        ${generatePageNumbers(currentPage, totalPages)}
-        
-        ${currentPage < totalPages ? `
-          <button onclick="changePage(${currentPage + 1})" class="page-button">›</button>
-          <button onclick="changePage(${totalPages})" class="page-button">»</button>
-        ` : ''}
+  galleryEl.innerHTML = images.map(img => `
+    <div class="gallery-item">
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div class="metadata">
+        <div>${img.prompt}</div>
+        <div>by ${img.username}</div>
+        <div>${new Date(img.created_at).toLocaleDateString()}</div>
       </div>
-    ` : ''}
-  `;
-}
-
-function generatePageNumbers(current, total) {
-  let pages = [];
-  const MAX_VISIBLE = 5;
-  
-  if (total <= MAX_VISIBLE) {
-    // Show all pages if total is small
-    for (let i = 1; i <= total; i++) {
-      pages.push(i);
-    }
-  } else {
-    // Complex pagination logic for many pages
-    if (current <= 3) {
-      // Near start
-      pages = [1, 2, 3, 4, '...', total];
-    } else if (current >= total - 2) {
-      // Near end
-      pages = [1, '...', total - 3, total - 2, total - 1, total];
-    } else {
-      // Middle
-      pages = [1, '...', current - 1, current, current + 1, '...', total];
-    }
-  }
-  
-  return pages.map(page => {
-    if (page === '...') {
-      return '<span class="page-ellipsis">...</span>';
-    }
-    return `
-      <button onclick="changePage(${page})" 
-              class="page-button ${page === current ? 'active' : ''}"
-      >${page}</button>
-    `;
-  }).join('');
-}
-
-function changePage(newPage) {
-  currentPage = newPage;
-  renderGallery();
-  // Scroll to top of gallery
-  document.querySelector('.gallery-container').scrollIntoView({ behavior: 'smooth' });
+      <div class="stats">
+        <span>${img.views || 0} views</span>
+        <span>${img.uses || 0} uses</span>
+      </div>
+      ${img.username === room.party.client.username ? `
+        <div class="gallery-item-controls">
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
 }
 
 async function showGalleryTab(tab) {

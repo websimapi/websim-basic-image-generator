@@ -246,3 +246,37 @@ function resetImage() {
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
 }
+
+function hasImageBeenModified() {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  // If there's no original image data, it hasn't been modified
+  if (!originalImageData) return false;
+  
+  const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const originalPixels = originalImageData.data;
+  const currentPixels = currentImageData.data;
+  
+  // Compare pixel data
+  for (let i = 0; i < originalPixels.length; i++) {
+    if (originalPixels[i] !== currentPixels[i]) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+function generateImageHash(imageData) {
+  let hash = 0;
+  const pixels = imageData.data;
+  
+  // Sample pixels at regular intervals for a quick comparison
+  for (let i = 0; i < pixels.length; i += 40) {
+    hash = ((hash << 5) - hash) + pixels[i];
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return hash;
+}
