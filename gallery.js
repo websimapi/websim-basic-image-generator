@@ -154,3 +154,47 @@ function filterGallery() {
   currentSearch = searchInput.value.trim();
   renderGallery();
 }
+
+async function addToGallery() {
+  const canvas = document.getElementById('editCanvas');
+  const promptInput = document.getElementById('promptInput');
+  const prefixSelect = document.getElementById('prefixPrompt');
+  const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+  
+  try {
+    let imageUrl;
+    
+    // Check if image was modified or loaded from desktop
+    if (currentImage && currentImage.src.startsWith('http') && !hasImageBeenModified()) {
+      // Use existing URL for unmodified images from gallery/generation
+      imageUrl = currentImage.src;
+    } else {
+      // For modified images or desktop uploads, create new blob and upload
+      const blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/png');
+      });
+      
+      // Create a File object from the blob
+      const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+      
+      // Upload the file and get the new URL
+      imageUrl = await websim.upload(file);
+    }
+    
+    // Add to gallery with appropriate URL
+    await room.collection('gallery_images').create({
+      prompt: fullPrompt,
+      imageUrl: imageUrl,
+      views: 0,
+      uses: 0,
+      modified: hasImageBeenModified() // Flag to indicate if this was edited
+    });
+    
+    alert('Image added to gallery successfully!');
+    
+  } catch (error) {
+    console.error('Error adding to gallery:', error);
+    alert('Failed to add image to gallery. Please try again.');
+  }
+}
