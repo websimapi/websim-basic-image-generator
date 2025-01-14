@@ -17,7 +17,7 @@ async function initGallery() {
   renderGallery();
 }
 
-async function renderGallery() {
+function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
   
@@ -40,49 +40,33 @@ async function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  const start = (currentPage - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  const paginatedImages = images.slice(start, end);
+  // Calculate pagination
+  const totalPages = Math.ceil(images.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const pageImages = images.slice(startIndex, endIndex);
 
-  if (paginatedImages.length === 0) {
+  // Update pagination controls
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById('prevPage').disabled = currentPage === 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+  if (pageImages.length === 0) {
     galleryEl.innerHTML = `
       <div class="no-results">
         ${currentSearch ? 'No images found matching your search' : 'No images available'}
       </div>
     `;
-    document.getElementById('prevPage').disabled = true;
-    document.getElementById('nextPage').disabled = true;
-    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
     return;
   }
 
-  galleryEl.innerHTML = paginatedImages.map(img => `
+  galleryEl.innerHTML = pageImages.map(img => `
     <div class="gallery-item">
-      <div class="gallery-image" 
-           style="background-image: url('${img.imageUrl}')"
-           onclick="loadGalleryImage('${img.id}')">
-      </div>
+      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
-        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
-          ${img.title || 'Untitled'} 
-          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
-        </div>
+        <div>${img.prompt}</div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
-        <div class="prompt-history">
-          <details>
-            <summary>Prompt History</summary>
-            <ol>
-              ${(img.promptHistory || []).map((entry, i) => `
-                <li>
-                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
-                  ${entry.prompt}
-                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
-                </li>
-              `).join('')}
-            </ol>
-          </details>
-        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -90,16 +74,21 @@ async function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
-  
-  document.getElementById('prevPage').disabled = currentPage === 1;
-  document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
+}
+
+async function showGalleryTab(tab) {
+  currentTab = tab;
+  currentPage = 1; // Reset to first page when changing tabs
+  document.querySelectorAll('.gallery-tab').forEach(el => {
+    el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
+  });
+  renderGallery();
 }
 
 async function loadGalleryImage(id) {
@@ -111,134 +100,26 @@ async function loadGalleryImage(id) {
   });
 
   const imageContainer = document.getElementById('imageContainer');
-  const existingImages = imageContainer.querySelectorAll('.gallery-generated-image, img');
+  const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
-
-  const generatedImage = document.createElement('div');
-  generatedImage.id = `generatedImage_${Date.now()}`;
-  generatedImage.className = 'gallery-generated-image';
-  generatedImage.style.backgroundImage = `url('${image.imageUrl}')`;
-
+  
+  const generatedImage = document.createElement('img');
+  generatedImage.id = `generatedImage_${imageCounter++}`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
+  generatedImage.src = image.imageUrl;
+  generatedImage.alt = image.prompt;
+  
   imageContainer.appendChild(generatedImage);
   currentImage = generatedImage;
-
+  
   document.getElementById('saveButton').style.display = 'block';
   document.getElementById('addGalleryButton').style.display = 'block';
-
-  // Load the image to set up the editor
-  const tempImg = new Image();
-  tempImg.onload = function () {
-    setupImageEditor(tempImg);
+  
+  currentImage.onload = function () {
+    setupImageEditor();
   };
-  tempImg.crossOrigin = 'anonymous';
-  tempImg.src = image.imageUrl;
-}
-
-function setupImageEditor(tempImg) {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  const editorControls = document.getElementById('editorControls');
-  const fillImagePrompt = document.getElementById('fillImagePrompt');
-  const loadingSpinner = document.getElementById('loadingSpinner');
-  const placeholderText = document.getElementById('placeholderText');
-  loadingSpinner.style.display = 'none';
-  placeholderText.style.display = 'none';
-  if (tempImg) {
-    canvas.width = tempImg.naturalWidth;
-    canvas.height = tempImg.naturalHeight;
-    ctx.drawImage(tempImg, 0, 0);
-    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    if (currentImage) currentImage.style.display = 'none';
-    canvas.style.display = 'block';
-    editorControls.style.display = 'flex';
-  } else {
-    canvas.style.display = 'none';
-    editorControls.style.display = 'none';
-  }
-  fillImagePrompt.style.display = 'none';
-  if (!canvas.hasEventListener) {
-    canvas.addEventListener('click', handleCanvasClick);
-    canvas.hasEventListener = true;
-  }
-}
-
-function generateImage() {
-  const prefixSelect = document.getElementById('prefixPrompt');
-  const promptInput = document.getElementById('promptInput');
-  const suffixSelect = document.getElementById('suffixPrompt');
-  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
-  if (!promptInput.value.trim()) {
-    alert('Please enter a prompt!');
-    return;
-  }
-
-  const imageContainer = document.getElementById('imageContainer');
-  const loadingSpinner = document.getElementById('loadingSpinner');
-  const placeholderText = document.getElementById('placeholderText');
-  const saveButton = document.getElementById('saveButton');
-  const addGalleryButton = document.getElementById('addGalleryButton');
-
-  loadingSpinner.style.display = 'block';
-  placeholderText.style.display = 'none';
-  saveButton.style.display = 'none';
-  addGalleryButton.style.display = 'none';
-
-  // Clear existing images
-  const existingImages = imageContainer.querySelectorAll('.gallery-generated-image, img');
-  existingImages.forEach(img => img.remove());
-
-  const generatedImage = document.createElement('div');
-  generatedImage.id = `generatedImage_${Date.now()}`;
-  generatedImage.className = 'gallery-generated-image';
-  generatedImage.style.display = 'none';
-
-  imageContainer.appendChild(generatedImage);
-  currentImage = generatedImage;
-
-  // Load the generated image
-  const tempImg = new Image();
-  tempImg.onload = async function() {
-    loadingSpinner.style.display = 'none';
-    generatedImage.style.display = 'block';
-    generatedImage.style.backgroundImage = `url('${tempImg.src}')`;
-    saveButton.style.display = 'block';
-    addGalleryButton.style.display = 'block';
-
-    try {
-      // Add to gallery
-      await room.collection('gallery_images').create({
-        title: promptInput.value.trim().substring(0, 50), // Use first 50 chars as initial title
-        prompt: fullPrompt,
-        imageUrl: tempImg.src,
-        views: 0,
-        uses: 0,
-        modified: false,
-        promptHistory: [{
-          type: 'original',
-          prompt: fullPrompt,
-          timestamp: new Date().toISOString()
-        }]
-      });
-
-      setupImageEditor(tempImg);
-
-    } catch (error) {
-      console.error('Error processing generated image:', error);
-      alert('Failed to process generated image. Please try again.');
-    }
-  };
-  tempImg.crossOrigin = 'anonymous';
-  tempImg.src = fullPrompt;
-}
-
-function showGalleryTab(tab) {
-  currentTab = tab;
-  currentPage = 1; // Reset to first page when changing tabs
-  document.querySelectorAll('.gallery-tab').forEach(el => {
-    el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
-  });
-  renderGallery();
 }
 
 function editImage(id) {

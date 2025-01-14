@@ -31,7 +31,7 @@ function renderGallery() {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
       img.prompt.toLowerCase().includes(searchLower) || 
-      img.username.toLowerCase().includes(searchLower)
+      img.title.toLowerCase().includes(searchLower)
     );
   }
 
@@ -64,31 +64,16 @@ function renderGallery() {
 
   galleryEl.innerHTML = paginatedImages.map(img => `
     <div class="gallery-item">
-      <div class="gallery-image" 
-           style="background-image: url('${img.imageUrl}')"
-           onclick="loadGalleryImage('${img.id}')">
-      </div>
+      <img 
+        src="${img.originalUrl}" 
+        alt="${img.prompt}" 
+        onerror="this.onerror=null; this.src='${img.imageUrl}';"
+        onclick="loadGalleryImage('${img.id}')"
+      >
       <div class="metadata">
-        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
-          ${img.title || 'Untitled'} 
-          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
-        </div>
+        <div>${img.prompt}</div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
-        <div class="prompt-history">
-          <details>
-            <summary>Prompt History</summary>
-            <ol>
-              ${(img.promptHistory || []).map((entry, i) => `
-                <li>
-                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
-                  ${entry.prompt}
-                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
-                </li>
-              `).join('')}
-            </ol>
-          </details>
-        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -96,13 +81,12 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
-  
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
@@ -130,26 +114,30 @@ async function loadGalleryImage(id) {
   });
   
   const imageContainer = document.getElementById('imageContainer');
-  const existingImages = imageContainer.querySelectorAll('.gallery-generated-image');
+  const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
   
-  const generatedImage = document.createElement('div');
+  const generatedImage = document.createElement('img');
   generatedImage.id = `generatedImage_${Date.now()}`;
-  generatedImage.className = 'gallery-generated-image';
-  generatedImage.style.backgroundImage = `url('${image.imageUrl}')`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
+  
+  generatedImage.onerror = function() {
+    this.onerror = null;
+    this.src = image.imageUrl;
+  };
+  generatedImage.src = image.originalUrl;
+  generatedImage.alt = image.prompt;
   
   imageContainer.appendChild(generatedImage);
   currentImage = generatedImage;
-  
   document.getElementById('saveButton').style.display = 'block';
   document.getElementById('addGalleryButton').style.display = 'block';
   
-  // Create a temporary image to detect when the background image has loaded
-  const tempImg = new Image();
-  tempImg.onload = function() {
+  currentImage.onload = function() {
     setupImageEditor();
   };
-  tempImg.src = image.imageUrl;
 }
 
 function setupImageEditor() {
@@ -162,17 +150,13 @@ function setupImageEditor() {
   loadingSpinner.style.display = 'none';
   placeholderText.style.display = 'none';
   if (currentImage) {
-    canvas.width = currentImage.offsetWidth;
-    canvas.height = currentImage.offsetHeight;
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      currentImage.style.display = 'none';
-      canvas.style.display = 'block';
-      editorControls.style.display = 'flex';
-    };
-    img.src = currentImage.style.backgroundImage.replace('url(', '').replace(')', '');
+    canvas.width = currentImage.naturalWidth;
+    canvas.height = currentImage.naturalHeight;
+    ctx.drawImage(currentImage, 0, 0);
+    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    currentImage.style.display = 'none';
+    canvas.style.display = 'block';
+    editorControls.style.display = 'flex';
   } else {
     canvas.style.display = 'none';
     editorControls.style.display = 'flex';
@@ -365,24 +349,20 @@ async function addToGallery() {
   const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
   
   try {
-    // Convert canvas to blob
     const blob = await new Promise(resolve => {
       canvas.toBlob(resolve, 'image/png');
     });
     
-    // Create a File object from the blob
     const file = new File([blob], 'edited-image.png', { type: 'image/png' });
     
-    // Upload the file and get the URL
     const imageUrl = await websim.upload(file);
     
-    // Add to gallery with the uploaded URL
     await room.collection('gallery_images').create({
       prompt: fullPrompt,
       imageUrl: imageUrl,
       views: 0,
       uses: 0,
-      modified: true // Flag to indicate this was edited
+      modified: true
     });
     
     alert('Image added to gallery successfully!');
@@ -393,7 +373,7 @@ async function addToGallery() {
   }
 }
 
-function generateImage() {
+async function generateImage() {
   const prefixSelect = document.getElementById('prefixPrompt');
   const promptInput = document.getElementById('promptInput');
   const suffixSelect = document.getElementById('suffixPrompt');
@@ -416,7 +396,6 @@ function generateImage() {
   saveButton.style.display = 'none';
   addGalleryButton.style.display = 'none';
 
-  // Clear existing images
   const existingImages = imageContainer.querySelectorAll('img');
   existingImages.forEach(img => img.remove());
 
@@ -426,15 +405,12 @@ function generateImage() {
   generatedImage.style.display = 'none';
   generatedImage.crossOrigin = 'anonymous';
   
-  // Set proper src and alt
   generatedImage.src = fullPrompt;
   generatedImage.alt = fullPrompt;
 
-  // Track initial source to detect when generation is complete
   const initialSrc = generatedImage.src;
   
   generatedImage.onload = async function() {
-    // Check if the src has changed (meaning generation is complete)
     if (generatedImage.src !== initialSrc) {
       loadingSpinner.style.display = 'none';
       generatedImage.style.display = 'block';
@@ -444,20 +420,24 @@ function generateImage() {
       currentImage = generatedImage;
       
       try {
-        // Add to gallery with the final generation URL
+        const response = await fetch(generatedImage.src);
+        const blob = await response.blob();
+        const file = new File([blob], 'generated-image.png', { type: 'image/png' });
+        const uploadedUrl = await websim.upload(file);
+        
         await room.collection('gallery_images').create({
+          title: promptInput.value.trim().substring(0, 50),
           prompt: fullPrompt,
-          imageUrl: generatedImage.src, // Use the final URL directly
+          originalUrl: generatedImage.src,
+          imageUrl: uploadedUrl,
           views: 0,
           uses: 0,
-          modified: false
-        });
-        
-        // Save prompt history
-        promptHistory.push({
-          type: 'original',
-          prompt: fullPrompt,
-          timestamp: new Date().toISOString()
+          modified: false,
+          promptHistory: [{
+            type: 'original',
+            prompt: fullPrompt,
+            timestamp: new Date().toISOString()
+          }]
         });
         
         setupImageEditor();
@@ -476,10 +456,8 @@ async function handleImageUpload(event) {
   const file = event.target.files[0];
   if (file) {
     try {
-      // Upload the file directly
       const imageUrl = await websim.upload(file);
       
-      // Create temporary image to get dimensions
       const uploadedImage = new Image();
       uploadedImage.onload = function() {
         currentImage = uploadedImage;
@@ -487,7 +465,6 @@ async function handleImageUpload(event) {
       };
       uploadedImage.src = URL.createObjectURL(file);
       
-      // Add to gallery with uploaded URL
       await room.collection('gallery_images').create({
         imageUrl: imageUrl,
         prompt: file.name,
@@ -515,34 +492,28 @@ function generateSelectionFill() {
     return;
   }
 
-  // Get prefix and suffix like main generation
   const prefixSelect = document.getElementById('prefixPrompt');
   const suffixSelect = document.getElementById('suffixPrompt');
   const fullPrompt = `${prefixSelect.value}${prompt}${suffixSelect.value}`;
 
-  // Show loading state
   const loadingSpinner = document.getElementById('loadingSpinner');
   loadingSpinner.style.display = 'block';
 
-  // Create new image element for generation
   const generatedImage = document.createElement('img');
   const tempId = `fillImage_${Date.now()}`;
   generatedImage.id = tempId;
   generatedImage.crossOrigin = 'anonymous';
   generatedImage.style.display = 'none';
   
-  // Set proper src and alt
   generatedImage.src = fullPrompt;
   generatedImage.alt = fullPrompt;
 
-  // When image loads (generation complete)
-  generatedImage.onload = function() {
+  generatedImage.onload = async function() {
     loadingSpinner.style.display = 'none';
     
     const canvas = document.getElementById('editCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Find selection bounds
     let minX = canvas.width;
     let minY = canvas.height;
     let maxX = 0;
@@ -560,7 +531,6 @@ function generateSelectionFill() {
       }
     }
 
-    // Create temporary canvas for scaling generated image
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     const selectionWidth = maxX - minX + 1;
@@ -569,17 +539,13 @@ function generateSelectionFill() {
     tempCanvas.width = selectionWidth;
     tempCanvas.height = selectionHeight;
     
-    // Draw and scale generated image to selection size
     tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
     
-    // Get scaled image data
     const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
     
-    // Get current canvas image data
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageData.data;
 
-    // Apply generated image to selection area
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         const pos = y * canvas.width + x;
@@ -597,24 +563,45 @@ function generateSelectionFill() {
       }
     }
 
-    // Update canvas with new image data
     ctx.putImageData(imageData, 0, 0);
     originalImageData = imageData;
 
-    // Save prompt history
-    promptHistory.push({
-      type: 'selection',
-      prompt: prompt,
-      timestamp: new Date().toISOString(),
-      parentId: generatedImage.alt
-    });
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+      const uploadedUrl = await websim.upload(file);
+      
+      const response = await fetch(generatedImage.src);
+      const genBlob = await response.blob();
+      const genFile = new File([genBlob], 'generated-fill.png', { type: 'image/png' });
+      const originalUrl = await websim.upload(genFile);
+      
+      const parentImage = galleryImages.find(img => img.id === currentEditId);
+      
+      await room.collection('gallery_images').create({
+        title: parentImage ? parentImage.title + ' (Modified)' : 'Untitled',
+        prompt: fullPrompt,
+        originalUrl: originalUrl,
+        imageUrl: uploadedUrl,
+        views: 0,
+        uses: 0,
+        modified: true,
+        promptHistory: [{
+          type: 'selection',
+          prompt: prompt,
+          timestamp: new Date().toISOString(),
+          parentId: parentImage ? parentImage.id : null
+        }]
+      });
+      
+    } catch (error) {
+      console.error('Error saving modified image:', error);
+      alert('Failed to save modified image');
+    }
 
-    // Cleanup
     document.getElementById('fillImagePrompt').style.display = 'none';
     generatedImage.remove();
   };
-
-  // Add image to document (hidden) to begin generation
   document.body.appendChild(generatedImage);
 }
 
@@ -628,14 +615,14 @@ document.addEventListener('keyup', function (e) {
   if (!e.ctrlKey) isCtrlPressed = false;
 });
 
-function editTitle(id) {
+function editImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
-  input.value = image.title || '';
+  input.value = image.prompt;
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
@@ -645,11 +632,11 @@ async function saveEdit() {
   const input = document.getElementById('editPromptInput');
   const newPrompt = input.value.trim();
   if (!newPrompt) {
-    alert('Please enter a title');
+    alert('Please enter a prompt');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    title: newPrompt
+    prompt: newPrompt
   });
   cancelEdit();
 }

@@ -7,28 +7,32 @@ let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
 
-function setupImageEditor(tempImg) {
+function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const editorControls = document.getElementById('editorControls');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
   const loadingSpinner = document.getElementById('loadingSpinner');
   const placeholderText = document.getElementById('placeholderText');
+
   loadingSpinner.style.display = 'none';
   placeholderText.style.display = 'none';
-  if (tempImg) {
-    canvas.width = tempImg.naturalWidth;
-    canvas.height = tempImg.naturalHeight;
-    ctx.drawImage(tempImg, 0, 0);
+
+  if (currentImage) {
+    canvas.width = currentImage.naturalWidth;
+    canvas.height = currentImage.naturalHeight;
+    ctx.drawImage(currentImage, 0, 0);
     originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    if (currentImage) currentImage.style.display = 'none';
+    currentImage.style.display = 'none';
     canvas.style.display = 'block';
     editorControls.style.display = 'flex';
   } else {
     canvas.style.display = 'none';
-    editorControls.style.display = 'none';
+    editorControls.style.display = 'flex';
   }
+
   fillImagePrompt.style.display = 'none';
+  
   if (!canvas.hasEventListener) {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.hasEventListener = true;
