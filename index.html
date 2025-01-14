@@ -1061,23 +1061,23 @@
       }
     }
 
-    function generateImage() {
+    async function generateImage() {
       const prefixSelect = document.getElementById('prefixPrompt');
       const promptInput = document.getElementById('promptInput');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
       
-      const imageContainer = document.getElementById('imageContainer');
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      const saveButton = document.getElementById('saveButton');
-      const editorControls = document.getElementById('editorControls');
-      const addGalleryButton = document.getElementById('addGalleryButton');
-
       if (!promptInput.value.trim()) {
         alert('Please enter a prompt!');
         return;
       }
+
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const placeholderText = document.getElementById('placeholderText');
+      const saveButton = document.getElementById('saveButton');
+      const addGalleryButton = document.getElementById('addGalleryButton');
+      const editorControls = document.getElementById('editorControls');
+      const imageContainer = document.getElementById('imageContainer');
 
       loadingSpinner.style.display = 'block';
       placeholderText.style.display = 'none';
@@ -1107,16 +1107,20 @@
           currentImage = generatedImage;
           
           try {
+            const promptHistory = [{
+              prompt: fullPrompt,
+              timestamp: new Date().toISOString(),
+              username: room.party.client.username,
+              type: 'original'
+            }];
+            
             await room.collection('gallery_images').create({
               prompt: fullPrompt,
-              imageUrl: generatedImage.src, 
+              title: fullPrompt,
+              imageUrl: generatedImage.src,
               views: 0,
               uses: 0,
-              promptHistory: [{
-                prompt: fullPrompt,
-                timestamp: new Date().toISOString(),
-                username: room.party.client.username
-              }]
+              promptHistory: promptHistory
             });
             
             setupImageEditor();
@@ -1131,41 +1135,7 @@
       imageContainer.appendChild(generatedImage);
     }
 
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        try {
-          const blob = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsArrayBuffer(file);
-          });
-          
-          const imageUrl = await websim.upload(file);
-          
-          const uploadedImage = new Image();
-          uploadedImage.onload = function() {
-            currentImage = uploadedImage;
-            setupImageEditor();
-          };
-          uploadedImage.src = URL.createObjectURL(file);
-          
-          await room.collection('gallery_images').create({
-            imageUrl: imageUrl,
-            prompt: file.name,
-            views: 0,
-            uses: 0,
-            modified: false
-          });
-          
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          alert('Failed to upload image. Please try again.');
-        }
-      }
-    }
-
-    function generateSelectionFill() {
+    async function generateSelectionFill() {
       if (!currentSelection) {
         alert('Please make a selection first');
         return;
@@ -1255,18 +1225,24 @@
           img.imageUrl === currentImage.src
         );
         
-        let promptHistory = sourceImage ? 
-          [...(sourceImage.promptHistory || [{
-            prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at,
-            username: sourceImage.username
-          }])] : [];
+        let promptHistory = [];
+        
+        if (sourceImage) {
+          promptHistory = [
+            ...sourceImage.promptHistory || [{
+              prompt: sourceImage.prompt,
+              timestamp: sourceImage.created_at,
+              username: sourceImage.username,
+              type: 'original'
+            }]
+          ];
+        }
         
         promptHistory.push({
           prompt: fullPrompt,
           timestamp: new Date().toISOString(),
-          type: 'selection-fill',
-          username: room.party.client.username
+          username: room.party.client.username,
+          type: 'selection-fill'
         });
         
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -1382,13 +1358,15 @@
             </svg>
           </div>
           <div class="prompt-history-entries">
-            ${image.promptHistory.map((entry, index) => `
+            ${image.promptHistory.map(entry => `
               <div class="prompt-history-entry">
                 <div>
-                  ${index === 0 ? 'Original prompt: ' : entry.type === 'selection-fill' ? 'Selection fill: ' : 'Modified with: '}
+                  ${entry.type === 'original' ? 'Original prompt: ' : 
+                    entry.type === 'selection-fill' ? 'Selection fill: ' : 
+                    'Modified with: '}
                   ${entry.prompt}
                 </div>
-                <div class="by-user">by ${entry.username || image.username}</div>
+                <div class="by-user">by ${entry.username}</div>
                 <div class="timestamp">${new Date(entry.timestamp).toLocaleString()}</div>
               </div>
             `).join('')}
