@@ -304,55 +304,6 @@ button:hover {
   background: #9c27b0;
 }
 
-/* Favorite User Group */
-.favorite-user-group {
-  background: rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.favorite-user-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.favorite-user-controls {
-  display: flex;
-  gap: 0.8rem;
-}
-
-.user-images-preview {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.8rem;
-}
-
-.view-all-button {
-  background: #2196F3;
-  min-width: auto;
-  padding: 0.5rem 1rem;
-}
-
-.unfavorite-button {
-  background: #f44336;
-  min-width: auto;
-  padding: 0.5rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.unfavorite-button:hover {
-  background: #d32f2f;
-}
-
-.heart-icon {
-  fill: currentColor;
-}
-
 /* Prompt History */
 .prompt-history {
   margin: 8px 0;

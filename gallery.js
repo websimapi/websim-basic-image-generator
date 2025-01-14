@@ -7,8 +7,6 @@ let imageCounter = 0;
 let currentImage = null;
 let currentPage = 1;
 const itemsPerPage = 10;
-let favoriteUsers = new Set(JSON.parse(localStorage.getItem('favoriteUsers') || '[]'));
-let currentUserFilter = null;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -31,10 +29,6 @@ function renderGallery() {
     );
   }
 
-  if (currentUserFilter) {
-    images = images.filter(img => img.username === currentUserFilter);
-  }
-
   switch (currentTab) {
     case 'popular':
       images.sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -42,56 +36,6 @@ function renderGallery() {
     case 'my':
       images = images.filter(img => img.username === room.party.client.username);
       break;
-    case 'favorites':
-      images = images.filter(img => favoriteUsers.has(img.username));
-      // Group images by username
-      const groupedByUser = {};
-      images.forEach(img => {
-        if (!groupedByUser[img.username]) {
-          groupedByUser[img.username] = [];
-        }
-        groupedByUser[img.username].push(img);
-      });
-
-      if (Object.keys(groupedByUser).length === 0) {
-        galleryEl.innerHTML = `
-          <div class="no-results">
-            You haven't favorited any users yet
-          </div>
-        `;
-        return;
-      }
-
-      galleryEl.innerHTML = Object.entries(groupedByUser).map(([username, userImages]) => `
-        <div class="favorite-user-group">
-          <div class="favorite-user-header">
-            <h3>${username}'s Gallery</h3>
-            <div class="favorite-user-controls">
-              <button onclick="showUserGallery('${username}', true)" class="view-all-button">View All</button>
-              <button onclick="unfavoriteUser('${username}')" class="unfavorite-button">
-                <svg class="heart-icon" viewBox="0 0 24 24" width="18" height="18">
-                  <path fill="currentColor" d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
-                </svg>
-                Unfavorite
-              </button>
-            </div>
-          </div>
-          <div class="user-images-preview">
-            ${userImages.slice(0, 4).map(img => `
-              <div class="gallery-item">
-                <div 
-                  class="gallery-item-image" 
-                  style="background-image: url('${img.imageUrl}')"
-                  onclick="loadGalleryImage('${img.id}')"
-                  role="img" 
-                  aria-label="${img.prompt}"
-                ></div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('');
-      return;
     default:
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
@@ -140,33 +84,11 @@ function renderGallery() {
 
 async function showGalleryTab(tab) {
   currentTab = tab;
-  currentUserFilter = null;
-  currentPage = 1;
+  currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
   renderGallery();
-}
-
-function showUserGallery(username, fromFavorites = false) {
-  if (fromFavorites) {
-    currentTab = 'recent';
-    document.querySelectorAll('.gallery-tab').forEach(el => {
-      el.classList.toggle('active', el.textContent.toLowerCase().includes('recent'));
-    });
-  }
-  currentUserFilter = username;
-  currentPage = 1;
-  renderGallery();
-  
-  const button = document.getElementById('favoriteButton');
-  if (favoriteUsers.has(username)) {
-    button.classList.add('favorited');
-    button.querySelector('.favorite-text').textContent = 'Favorited';
-  } else {
-    button.classList.remove('favorited');
-    button.querySelector('.favorite-text').textContent = 'Favorite';
-  }
 }
 
 async function loadGalleryImage(id) {
@@ -254,14 +176,6 @@ function changePage(delta) {
   
   if (newPage >= 1 && newPage <= totalPages) {
     currentPage = newPage;
-    renderGallery();
-  }
-}
-
-function unfavoriteUser(username) {
-  if (confirm(`Are you sure you want to unfavorite ${username}?`)) {
-    favoriteUsers.delete(username);
-    localStorage.setItem('favoriteUsers', JSON.stringify([...favoriteUsers]));
     renderGallery();
   }
 }
