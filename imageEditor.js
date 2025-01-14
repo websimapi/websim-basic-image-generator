@@ -6,6 +6,8 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
+let textPreview = null;
+let currentTextPosition = null;
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -41,15 +43,48 @@ function setupImageEditor() {
 
 function handleCanvasClick(e) {
   const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (canvas.width / rect.width);
   const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  const activeTool = document.querySelector('.tool-button.active');
+  if (activeTool && activeTool.id === 'textTool') {
+    const textControls = document.getElementById('textControls');
+    textControls.style.display = 'flex';
+    textControls.style.position = 'fixed';
+    textControls.style.left = `${e.clientX}px`;
+    textControls.style.top = `${e.clientY + 20}px`;
+    
+    currentTextPosition = { 
+      x,
+      y,
+      screenX: e.clientX,
+      screenY: e.clientY
+    };
+    
+    const textInput = document.getElementById('textInput');
+    textInput.focus();
+    
+    if (textPreview) {
+      textPreview.remove();
+    }
+    
+    textPreview = document.createElement('div');
+    textPreview.className = 'text-preview';
+    textPreview.style.position = 'fixed';
+    textPreview.style.left = `${e.clientX}px`;
+    textPreview.style.top = `${e.clientY}px`;
+    document.body.appendChild(textPreview);
+    
+    updateTextPreview();
+    return;
+  }
 
   if (!isShiftPressed && !isCtrlPressed) {
     currentSelection = null;
   }
 
+  const ctx = canvas.getContext('2d');
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
 
@@ -245,4 +280,65 @@ function resetImage() {
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
+}
+
+function updateTextPreview() {
+  if (!textPreview || !currentTextPosition) return;
+  
+  const text = document.getElementById('textInput').value;
+  const fontFamily = document.getElementById('fontFamily').value;
+  const fontSize = document.getElementById('fontSize').value;
+  const color = document.getElementById('textColor').value;
+  
+  textPreview.textContent = text || 'Enter text...';
+  textPreview.style.fontFamily = fontFamily;
+  textPreview.style.fontSize = `${fontSize}px`;
+  textPreview.style.color = color;
+  textPreview.style.position = 'fixed'; 
+  textPreview.style.left = `${currentTextPosition.screenX}px`;
+  textPreview.style.top = `${currentTextPosition.screenY}px`;
+}
+
+function handleCanvasMouseMove(e) {
+  const activeTool = document.querySelector('.tool-button.active');
+  if (activeTool && activeTool.id === 'textTool') {
+    return; 
+  }
+  // ... other mouse move handling ...
+}
+
+function commitText() {
+  if (!currentTextPosition) return;
+  
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const text = document.getElementById('textInput').value;
+  
+  if (!text.trim()) {
+    cancelText();
+    return;
+  }
+  
+  ctx.save();
+  
+  const fontFamily = document.getElementById('fontFamily').value;
+  const fontSize = parseInt(document.getElementById('fontSize').value); 
+  const color = document.getElementById('textColor').value;
+  
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.fillStyle = color;
+  ctx.textBaseline = 'top';
+  
+  ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
+  
+  ctx.restore();
+}
+
+function cancelText() {
+  if (textPreview) {
+    textPreview.remove();
+  }
+  currentTextPosition = null;
+  const textControls = document.getElementById('textControls');
+  textControls.style.display = 'none';
 }
