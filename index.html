@@ -1322,11 +1322,10 @@
       document.body.appendChild(textPreview);
       
       // Position controls below preview
-      // Ensure controls stay within viewport
       const controlsHeight = 150; 
       const controlsWidth = 300;  
       
-      let top = clientY + 30; 
+      let top = clientY + 30; // Position controls below text
       let left = clientX;
       
       // Adjust vertical position if too close to bottom
@@ -1346,6 +1345,13 @@
       currentTextPosition = { x: canvasX, y: canvasY };
       
       const textInput = document.getElementById('textInput');
+      const fontSize = document.getElementById('fontSize');
+      
+      // Set initial font size based on current canvas scale
+      const canvasScale = canvas.width / rect.width;
+      const initialFontSize = Math.round(24 / canvasScale);
+      fontSize.value = initialFontSize;
+      
       textInput.focus();
       
       updateTextPreview();
@@ -1354,6 +1360,10 @@
     function updateTextPreview() {
       if (!textPreview || !currentTextPosition) return;
       
+      const canvas = document.getElementById('editCanvas');
+      const rect = canvas.getBoundingClientRect();
+      const canvasScale = canvas.width / rect.width;
+      
       const text = document.getElementById('textInput').value;
       const fontFamily = document.getElementById('fontFamily').value;
       const fontSize = document.getElementById('fontSize').value;
@@ -1361,7 +1371,8 @@
       
       textPreview.textContent = text || 'Enter text...';
       textPreview.style.fontFamily = fontFamily;
-      textPreview.style.fontSize = `${fontSize}px`;
+      // Scale the preview font size to match what will be drawn on canvas
+      textPreview.style.fontSize = `${fontSize * canvasScale}px`;
       textPreview.style.color = color;
     }
 
@@ -1383,6 +1394,7 @@
       const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
+      // Use the selected font size directly for canvas
       ctx.font = `${fontSize}px ${fontFamily}`;
       ctx.fillStyle = color;
       ctx.textBaseline = 'top';
