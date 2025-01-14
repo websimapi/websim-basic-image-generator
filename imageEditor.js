@@ -6,6 +6,8 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
+let textPreview = null;
+let currentTextPosition = null;
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -181,6 +183,16 @@ function setTool(tool) {
         fillImagePrompt.style.display = 'flex';
       }
       break;
+    case 'text':
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        handleTextTool(clientX, clientY, canvasX, canvasY);
+      });
+      break;
     default:
       fillImagePrompt.style.display = 'none';
   }
@@ -245,4 +257,67 @@ function resetImage() {
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
+}
+
+function handleTextTool(clientX, clientY, canvasX, canvasY) {
+  const canvas = document.getElementById('editCanvas');
+  const rect = canvas.getBoundingClientRect();
+
+  // Calculate relative canvas coordinates
+  const scale = canvas.width / rect.width;
+  const realX = canvasX;
+  const realY = canvasY;
+
+  // Position text controls above or below depending on available space
+  const textControls = document.getElementById('textControls');
+  textControls.style.display = 'flex';
+  
+  // Calculate if there's room above
+  const spaceAbove = clientY > 150;
+  if (spaceAbove) {
+    textControls.style.top = `${clientY - textControls.offsetHeight - 10}px`; 
+  } else {
+    textControls.style.top = `${clientY + 30}px`;
+  }
+  textControls.style.left = `${clientX}px`;
+
+  currentTextPosition = { x: realX, y: realY };
+  
+  const textInput = document.getElementById('textInput');
+  textInput.focus();
+  
+  if (textPreview) {
+    textPreview.remove();
+  }
+  
+  textPreview = document.createElement('div');
+  textPreview.className = 'text-preview';
+
+  // Position preview exactly at click point
+  textPreview.style.position = 'fixed';
+  textPreview.style.left = `${clientX}px`;
+  textPreview.style.top = `${clientY}px`;
+  textPreview.style.transform = 'translate(0, -50%)'; // Center vertically
+  textPreview.style.pointerEvents = 'none'; // Prevent interaction with preview
+  
+  document.body.appendChild(textPreview);
+  
+  updateTextPreview();
+}
+
+function updateTextPreview() {
+  if (!textPreview || !currentTextPosition) return;
+  
+  const text = document.getElementById('textInput').value;
+  const fontFamily = document.getElementById('fontFamily').value;
+  const fontSize = document.getElementById('fontSize').value;
+  const color = document.getElementById('textColor').value;
+  
+  textPreview.textContent = text || 'Enter text...';
+  textPreview.style.fontFamily = fontFamily;
+  textPreview.style.fontSize = `${fontSize}px`;
+  textPreview.style.color = color;
+
+  // Keep preview fixed at original click position
+  textPreview.style.transform = 'translate(0, -50%)';
 }
