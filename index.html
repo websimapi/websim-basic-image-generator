@@ -545,6 +545,19 @@
     .clear-filter-button:hover {
       background: #d32f2f;
     }
+
+    .image-metadata {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      width: 100%;
+    }
+
+    .image-metadata .metadata {
+      text-align: left;
+      padding: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -862,6 +875,12 @@
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
       
+      // Remove any existing metadata
+      const existingMetadata = imageContainer.querySelector('.image-metadata');
+      if (existingMetadata) {
+        existingMetadata.remove();
+      }
+      
       const generatedImage = document.createElement('img');
       generatedImage.id = `generatedImage_${Date.now()}`;
       generatedImage.className = 'generated-image';
@@ -871,6 +890,20 @@
       generatedImage.alt = image.prompt;
       
       imageContainer.appendChild(generatedImage);
+      
+      // Add metadata display
+      const metadataDiv = document.createElement('div');
+      metadataDiv.className = 'image-metadata';
+      metadataDiv.innerHTML = `
+        <div class="metadata">
+          <div>${image.prompt}</div>
+          <div>by <span class="username-link" onclick="showUserGallery('${image.username}')">${image.username}</span></div>
+          <div>${new Date(image.created_at).toLocaleDateString()}</div>
+          ${renderPromptHistory(image)}
+        </div>
+      `;
+      imageContainer.appendChild(metadataDiv);
+      
       currentImage = generatedImage;
       document.getElementById('saveButton').style.display = 'block';
       document.getElementById('addGalleryButton').style.display = 'block';
@@ -1165,6 +1198,12 @@
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
 
+      // Remove any existing metadata
+      const existingMetadata = imageContainer.querySelector('.image-metadata');
+      if (existingMetadata) {
+        existingMetadata.remove();
+      }
+
       const generatedImage = document.createElement('img');
       generatedImage.id = `generatedImage_${Date.now()}`;
       generatedImage.className = 'generated-image';
@@ -1173,10 +1212,8 @@
       generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
-      const initialSrc = generatedImage.src;
-      
       generatedImage.onload = async function() {
-        if (generatedImage.src !== initialSrc) {
+        if (generatedImage.src !== fullPrompt) {
           loadingSpinner.style.display = 'none';
           generatedImage.style.display = 'block';
           placeholderText.style.display = 'none';
@@ -1185,7 +1222,7 @@
           currentImage = generatedImage;
           
           try {
-            await room.collection('gallery_images').create({
+            const galleryItem = await room.collection('gallery_images').create({
               prompt: fullPrompt,
               imageUrl: generatedImage.src, 
               views: 0,
@@ -1196,6 +1233,18 @@
                 username: room.party.client.username
               }]
             });
+
+            // Add metadata display below the image
+            const metadataDiv = document.createElement('div');
+            metadataDiv.className = 'image-metadata';
+            metadataDiv.innerHTML = `
+              <div class="metadata">
+                <div>${fullPrompt}</div>
+                <div>by <span class="username-link" onclick="showUserGallery('${room.party.client.username}')">${room.party.client.username}</span></div>
+                <div>${new Date().toLocaleDateString()}</div>
+              </div>
+            `;
+            imageContainer.appendChild(metadataDiv);
             
             setupImageEditor();
             
