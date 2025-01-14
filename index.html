@@ -1377,7 +1377,7 @@
       textPreview.textContent = text || 'Enter text...';
     }
 
-    function commitText() {
+    async function commitText() {
       if (!currentTextPosition) return;
       
       const canvas = document.getElementById('editCanvas');
@@ -1407,6 +1407,46 @@
       ctx.restore();
       
       originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Add text modification to prompt history if a gallery image is being edited
+      const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+      
+      if (sourceImage) {
+        let promptHistory = [...(sourceImage.promptHistory || [{
+          prompt: sourceImage.prompt,
+          timestamp: sourceImage.created_at,
+          username: sourceImage.username
+        }])];
+        
+        // Add text modification entry
+        promptHistory.push({
+          prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
+          timestamp: new Date().toISOString(),
+          type: 'text-edit',
+          username: room.party.client.username
+        });
+        
+        // Create new modified image entry
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+        const imageUrl = await websim.upload(file);
+        
+        await room.collection('gallery_images').create({
+          prompt: sourceImage.prompt,
+          title: sourceImage.title || sourceImage.prompt,
+          imageUrl: imageUrl,
+          views: 0,
+          uses: 0,
+          modified: true,
+          promptHistory: promptHistory,
+          sourceImageId: sourceImage.id
+        });
+
+        // Update usage count of source image
+        await room.collection('gallery_images').update(sourceImage.id, {
+          uses: (sourceImage.uses || 0) + 1
+        });
+      }
       
       cancelText();
     }
@@ -1518,7 +1558,10 @@
             ${image.promptHistory.map((entry, index) => `
               <div class="prompt-history-entry">
                 <div>
-                  ${index === 0 ? 'Original prompt: ' : entry.type === 'selection-fill' ? 'Selection fill: ' : 'Modified with: '}
+                  ${index === 0 ? 'Original prompt: ' : 
+                    entry.type === 'selection-fill' ? 'Selection fill: ' : 
+                    entry.type === 'text-edit' ? 'Text edit: ' : 
+                    'Modified with: '}
                   ${entry.prompt}
                 </div>
                 <div class="by-user">by ${entry.username || image.username}</div>
