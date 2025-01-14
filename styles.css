@@ -212,49 +212,13 @@ button:hover {
   margin-bottom: 2rem;
 }
 
-.gallery-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  background: rgba(255,255,255,0.05);
-  padding: 1rem;
-  border-radius: 8px;
-  width: 100%;
-}
-
-.gallery-tabs {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.gallery-tab {
-  padding: 0.8rem 1.5rem;
-  background: rgba(255,255,255,0.1);
-  border: none;
-  border-radius: 5px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.gallery-tab.active {
-  background: #2196F3;
-}
-
-.gallery-tab:hover {
-  transform: translateY(-2px);
-}
-
 .gallery-item {
   background: rgba(255,255,255,0.1);
   border-radius: 8px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.5rem;
   transition: transform 0.2s;
 }
 
@@ -262,23 +226,21 @@ button:hover {
   transform: translateY(-2px);
 }
 
-.gallery-item-image {
+.gallery-item img {
   width: 100%;
   height: 200px;
   object-fit: cover;
   border-radius: 4px;
   cursor: pointer;
-  background-size: cover;
-  background-position: center;
-  transition: transform 0.2s;
 }
 
-.gallery-item .metadata {
-  font-size: 0.9rem;
-  color: rgba(255,255,255,0.9);
+.gallery-header {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .gallery-item-controls {
@@ -289,42 +251,41 @@ button:hover {
 
 .gallery-item-controls button {
   padding: 0.4rem;
-  min-width: 32px;
+  min-width: auto;
   width: 32px;
   height: 32px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255,255,255,0.1);
+}
+
+.gallery-item-controls button:hover {
+  transform: scale(1.1);
+  background: rgba(255,255,255,0.2);
+}
+
+.gallery-item-controls button svg {
+  width: 16px;
+  height: 16px;
+  fill: white;
 }
 
 .edit-button {
   background: #2196F3 !important;
 }
 
+.edit-button:hover {
+  background: #1976D2 !important;
+}
+
 .delete-button {
   background: #f44336 !important;
 }
 
-.gallery-pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin: 2rem 0;
-  padding: 1rem;
-  background: rgba(255,255,255,0.05);
-  border-radius: 8px;
-  flex-wrap: wrap;
-}
-
-.page-jump {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: rgba(255,255,255,0.1);
-  padding: 0.5rem;
-  border-radius: 4px;
+.delete-button:hover {
+  background: #d32f2f !important;
 }
 
 /* Action Buttons */
@@ -345,32 +306,40 @@ button:hover {
 
 /* Prompt History */
 .prompt-history {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
   background: rgba(0,0,0,0.2);
   border-radius: 4px;
-  margin-top: 0.5rem;
   overflow: hidden;
 }
 
 .prompt-history-header {
-  padding: 0.8rem;
+  padding: 8px 12px;
   background: rgba(255,255,255,0.1);
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  user-select: none;
+}
+
+.prompt-history-header:hover {
+  background: rgba(255,255,255,0.15);
 }
 
 .prompt-history-entries {
-  padding: 0.8rem;
-  display: none;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
 }
 
-.expanded .prompt-history-entries {
-  display: block;
+.prompt-history.expanded .prompt-history-entries {
+  max-height: 500px;
 }
 
 .prompt-history-entry {
-  padding: 0.8rem;
+  padding: 8px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -378,36 +347,19 @@ button:hover {
   border-bottom: none;
 }
 
-.username-link {
-  color: #2196F3;
-  cursor: pointer;
-  text-decoration: underline;
+.prompt-history-entry .by-user {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
 }
 
-.username-link:hover {
-  color: #1976D2;
+.expand-icon {
+  transform: rotate(0deg);
+  transition: transform 0.3s ease;
 }
 
-#userFilterInfo {
-  width: 100%;
-  background: rgba(255,255,255,0.1);
-  padding: 0.8rem;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.clear-filter-button {
-  padding: 0.4rem 0.8rem;
-  background: #f44336;
-  border: none;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
-  min-width: auto;
+.prompt-history.expanded .expand-icon {
+  transform: rotate(180deg);
 }
 
 /* Responsive Design */
@@ -426,20 +378,9 @@ button:hover {
 
   .gallery-header {
     flex-direction: column;
-    align-items: stretch;
   }
-  
-  .gallery-tabs {
-    flex-wrap: wrap;
-  }
-  
-  .gallery-tab {
-    flex: 1;
-    padding: 0.6rem;
-  }
-  
-  .page-jump {
-    width: 100%;
-    justify-content: center;
+
+  .tool-group {
+    gap: 0.5rem;
   }
 }
