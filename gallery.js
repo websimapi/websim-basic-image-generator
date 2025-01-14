@@ -72,6 +72,7 @@ function renderGallery() {
         <span>${img.views || 0} views</span>
         <span>${img.uses || 0} uses</span>
       </div>
+      ${renderPromptHistory(img)}
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
           <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
@@ -80,6 +81,59 @@ function renderGallery() {
       ` : ''}
     </div>
   `).join('');
+}
+
+function renderPromptHistory(image) {
+  if (!image.promptHistory || !image.promptHistory.length) {
+    return `
+      <div class="prompt-history">
+        <div class="prompt-history-header" onclick="togglePromptHistory(this)">
+          <span>Prompt History (1)</span>
+          <svg class="expand-icon" width="12" height="12" viewBox="0 0 12 12">
+            <path fill="currentColor" d="M6 8L2 4h8z"/>
+          </svg>
+        </div>
+        <div class="prompt-history-entries" style="display: block;">
+          <div class="prompt-history-entry">
+            <div>Original prompt: ${image.prompt}</div>
+            <div class="by-user">by ${image.username}</div>
+            <div class="timestamp">${new Date(image.created_at).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Sort prompt history by timestamp to ensure chronological order
+  const sortedHistory = [...image.promptHistory].sort((a, b) => 
+    new Date(a.timestamp) - new Date(b.timestamp)
+  );
+
+  return `
+    <div class="prompt-history">
+      <div class="prompt-history-header" onclick="togglePromptHistory(this)">
+        <span>Prompt History (${sortedHistory.length})</span>
+        <svg class="expand-icon" width="12" height="12" viewBox="0 0 12 12">
+          <path fill="currentColor" d="M6 8L2 4h8z"/>
+        </svg>
+      </div>
+      <div class="prompt-history-entries">
+        ${sortedHistory.map((entry, index) => `
+          <div class="prompt-history-entry">
+            <div>
+              ${index === 0 ? 'Original prompt: ' : 
+                entry.type === 'selection-fill' ? 'Selection fill: ' : 
+                entry.type === 'text-edit' ? 'Text edit: ' : 
+                'Modified with: '}
+              ${entry.prompt}
+            </div>
+            <div class="by-user">by ${entry.username}</div>
+            <div class="timestamp">${new Date(entry.timestamp).toLocaleString()}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 async function showGalleryTab(tab) {
@@ -178,4 +232,119 @@ function changePage(delta) {
     currentPage = newPage;
     renderGallery();
   }
+}
+
+async function generateSelectionFill() {
+  // ... existing code ...
+  
+  generatedImage.onload = async function() {
+    // ... existing drawing code ...
+
+    const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+        
+    if (sourceImage) {
+      await room.collection('gallery_images').update(sourceImage.id, {
+        uses: (sourceImage.uses || 0) + 1
+      });
+
+      // Get the full history chain by following sourceImageId
+      let fullHistory = [];
+      let currentImg = sourceImage;
+      
+      while (currentImg) {
+        if (currentImg.promptHistory) {
+          fullHistory = [...currentImg.promptHistory, ...fullHistory];
+        } else {
+          fullHistory.unshift({
+            prompt: currentImg.prompt,
+            timestamp: currentImg.created_at,
+            username: currentImg.username
+          });
+        }
+        currentImg = currentImg.sourceImageId ? 
+          galleryImages.find(img => img.id === currentImg.sourceImageId) : 
+          null;
+      }
+
+      // Add the new modification
+      fullHistory.push({
+        prompt: `Selection fill: ${fullPrompt}`,
+        timestamp: new Date().toISOString(),
+        type: 'selection-fill',
+        username: room.party.client.username
+      });
+
+      // Create the new image with complete history
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+      const imageUrl = await websim.upload(file);
+      
+      await room.collection('gallery_images').create({
+        prompt: fullPrompt,
+        title: sourceImage.title || sourceImage.prompt,
+        imageUrl: imageUrl,
+        views: 0,
+        uses: 0,
+        modified: true,
+        promptHistory: fullHistory,
+        sourceImageId: sourceImage.id
+      });
+    }
+  };
+}
+
+async function commitText() {
+  // ... existing code ...
+
+  const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+      
+  if (sourceImage) {
+    // Get the full history chain
+    let fullHistory = [];
+    let currentImg = sourceImage;
+    
+    while (currentImg) {
+      if (currentImg.promptHistory) {
+        fullHistory = [...currentImg.promptHistory, ...fullHistory];
+      } else {
+        fullHistory.unshift({
+          prompt: currentImg.prompt,
+          timestamp: currentImg.created_at,
+          username: currentImg.username
+        });
+      }
+      currentImg = currentImg.sourceImageId ? 
+        galleryImages.find(img => img.id === currentImg.sourceImageId) : 
+        null;
+    }
+
+    // Add the new text modification
+    fullHistory.push({
+      prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
+      timestamp: new Date().toISOString(),
+      type: 'text-edit',
+      username: room.party.client.username
+    });
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+    const imageUrl = await websim.upload(file);
+    
+    await room.collection('gallery_images').create({
+      prompt: sourceImage.prompt,
+      title: sourceImage.title || sourceImage.prompt,
+      imageUrl: imageUrl,
+      views: 0,
+      uses: 0,
+      modified: true,
+      promptHistory: fullHistory,
+      sourceImageId: sourceImage.id
+    });
+
+    await room.collection('gallery_images').update(sourceImage.id, {
+      uses: (sourceImage.uses || 0) + 1
+    });
+  }
+  
+  cancelText();
 }
