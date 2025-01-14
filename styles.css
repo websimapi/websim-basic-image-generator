@@ -243,6 +243,51 @@ button:hover {
   margin-bottom: 1rem;
 }
 
+.gallery-item-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.gallery-item-controls button {
+  padding: 0.4rem;
+  min-width: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.1);
+}
+
+.gallery-item-controls button:hover {
+  transform: scale(1.1);
+  background: rgba(255,255,255,0.2);
+}
+
+.gallery-item-controls button svg {
+  width: 16px;
+  height: 16px;
+  fill: white;
+}
+
+.edit-button {
+  background: #2196F3 !important;
+}
+
+.edit-button:hover {
+  background: #1976D2 !important;
+}
+
+.delete-button {
+  background: #f44336 !important;
+}
+
+.delete-button:hover {
+  background: #d32f2f !important;
+}
+
 /* Action Buttons */
 .action-buttons {
   display: flex;
