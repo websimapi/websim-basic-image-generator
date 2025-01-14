@@ -794,7 +794,8 @@
       if (!image) return;
       
       await room.collection('gallery_images').update(id, {
-        views: (image.views || 0) + 1
+        views: (image.views || 0) + 1,
+        uses: (image.uses || 0) + 1
       });
       
       const imageContainer = document.getElementById('imageContainer');
@@ -808,12 +809,6 @@
       generatedImage.crossOrigin = 'anonymous';
       generatedImage.src = image.imageUrl;
       generatedImage.alt = image.prompt;
-      
-      if (image.promptUrl) {
-        generatedImage.onerror = function() {
-          this.src = image.promptUrl;
-        };
-      }
       
       imageContainer.appendChild(generatedImage);
       currentImage = generatedImage;
@@ -1083,7 +1078,7 @@
       }
     }
 
-    async function generateImage() {
+    function generateImage() {
       const prefixSelect = document.getElementById('prefixPrompt');
       const promptInput = document.getElementById('promptInput');
       const suffixSelect = document.getElementById('suffixPrompt');
@@ -1114,45 +1109,24 @@
       generatedImage.className = 'generated-image';
       generatedImage.style.display = 'none';
       generatedImage.crossOrigin = 'anonymous';
-      
-      const promptUrl = fullPrompt;
-      generatedImage.src = promptUrl;
+      generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
       const initialSrc = generatedImage.src;
       
-      generatedImage.onerror = function() {
-        if (this.dataset.fallbackUrl) {
-          this.src = this.dataset.fallbackUrl;
-        }
-      };
-
       generatedImage.onload = async function() {
         if (generatedImage.src !== initialSrc) {
+          loadingSpinner.style.display = 'none';
+          generatedImage.style.display = 'block';
+          placeholderText.style.display = 'none';
+          saveButton.style.display = 'block';
+          addGalleryButton.style.display = 'block';
+          currentImage = generatedImage;
+          
           try {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = generatedImage.naturalWidth;
-            tempCanvas.height = generatedImage.naturalHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(generatedImage, 0, 0);
-            
-            const blob = await new Promise(resolve => tempCanvas.toBlob(resolve, 'image/png'));
-            const file = new File([blob], 'generated-image.png', { type: 'image/png' });
-            const uploadedUrl = await websim.upload(file);
-            
-            generatedImage.dataset.fallbackUrl = uploadedUrl;
-            
-            loadingSpinner.style.display = 'none';
-            generatedImage.style.display = 'block';
-            placeholderText.style.display = 'none';
-            saveButton.style.display = 'block';
-            addGalleryButton.style.display = 'block';
-            currentImage = generatedImage;
-            
             await room.collection('gallery_images').create({
               prompt: fullPrompt,
-              imageUrl: uploadedUrl,
-              promptUrl: promptUrl, 
+              imageUrl: generatedImage.src, 
               views: 0,
               uses: 0,
               promptHistory: [{
@@ -1178,6 +1152,12 @@
       const file = event.target.files[0];
       if (file) {
         try {
+          const blob = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsArrayBuffer(file);
+          });
+          
           const imageUrl = await websim.upload(file);
           
           const uploadedImage = new Image();
@@ -1185,20 +1165,14 @@
             currentImage = uploadedImage;
             setupImageEditor();
           };
-          uploadedImage.src = imageUrl;
+          uploadedImage.src = URL.createObjectURL(file);
           
           await room.collection('gallery_images').create({
             imageUrl: imageUrl,
             prompt: file.name,
             views: 0,
             uses: 0,
-            modified: false,
-            promptHistory: [{
-              prompt: file.name,
-              timestamp: new Date().toISOString(),
-              username: room.party.client.username,
-              type: 'upload'
-            }]
+            modified: false
           });
           
         } catch (error) {
@@ -1344,19 +1318,23 @@
       const canvas = document.getElementById('editCanvas');
       const rect = canvas.getBoundingClientRect();
       
+      // Remove existing preview
       if (textPreview) {
         textPreview.remove();
       }
       
+      // Create new preview at click position
       textPreview = document.createElement('div');
       textPreview.className = 'text-preview';
       textPreview.style.position = 'fixed';
       textPreview.style.left = `${clientX}px`;
       textPreview.style.top = `${clientY}px`;
 
+      // Calculate scale factor between canvas display size and actual size
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
 
+      // Store scale factors with position
       currentTextPosition = { 
         x: canvasX, 
         y: canvasY,
@@ -1366,16 +1344,19 @@
 
       document.body.appendChild(textPreview);
       
+      // Position controls below preview
       const controlsHeight = 100; 
       const controlsWidth = 250;  
       
       let top = clientY + 30; 
       let left = clientX;
       
+      // Adjust vertical position if too close to bottom
       if (top + controlsHeight > window.innerHeight) {
         top = window.innerHeight - controlsHeight - 10;
       }
       
+      // Adjust horizontal position if too close to right edge
       if (left + controlsWidth > window.innerWidth) {
         left = window.innerWidth - controlsWidth - 10;
       }
@@ -1423,6 +1404,7 @@
       const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
+      // Scale the font size based on the canvas scaling
       const scaledFontSize = fontSize * currentTextPosition.scaleX;
       ctx.font = `${scaledFontSize}px ${fontFamily}`;
       ctx.fillStyle = color;
@@ -1435,6 +1417,7 @@
       
       originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
+      // Add text modification to prompt history if a gallery image is being edited
       const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
       
       if (sourceImage) {
@@ -1444,6 +1427,7 @@
           username: sourceImage.username
         }])];
         
+        // Add text modification entry
         promptHistory.push({
           prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
           timestamp: new Date().toISOString(),
@@ -1451,6 +1435,7 @@
           username: room.party.client.username
         });
         
+        // Create new modified image entry
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         const file = new File([blob], 'edited-image.png', { type: 'image/png' });
         const imageUrl = await websim.upload(file);
@@ -1466,6 +1451,7 @@
           sourceImageId: sourceImage.id
         });
 
+        // Update usage count of source image
         await room.collection('gallery_images').update(sourceImage.id, {
           uses: (sourceImage.uses || 0) + 1
         });
