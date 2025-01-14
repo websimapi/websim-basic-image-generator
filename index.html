@@ -1000,32 +1000,13 @@
       async function loadGalleryImage(id) {
         const image = galleryImages.find(img => img.id === id);
         if (!image) return;
-        
-        await room.collection('gallery_images').update(id, {
-          views: (image.views || 0) + 1,
-          uses: (image.uses || 0) + 1
-        });
-        
-        const imageContainer = document.getElementById('imageContainer');
-        const existingImages = imageContainer.querySelectorAll('img');
-        existingImages.forEach(img => img.remove());
-        
-        const generatedImage = document.createElement('img');
-        generatedImage.id = `generatedImage_${Date.now()}`;
-        generatedImage.className = 'generated-image';
-        generatedImage.style.display = 'none';
-        generatedImage.crossOrigin = 'anonymous';
-        generatedImage.src = image.imageUrl;
-        generatedImage.alt = image.prompt;
-        
-        imageContainer.appendChild(generatedImage);
-        currentImage = generatedImage;
-        document.getElementById('saveButton').style.display = 'block';
-        document.getElementById('addGalleryButton').style.display = 'block';
-        
-        currentImage.onload = function () {
-          setupImageEditor();
-        };
+        currentEditId = id;
+        const dialog = document.getElementById('editPromptDialog');
+        const overlay = document.getElementById('overlay');
+        const input = document.getElementById('editPromptInput');
+        input.value = image.prompt;
+        dialog.style.display = 'block';
+        overlay.style.display = 'block';
       }
 
       function setupImageEditor() {
@@ -1246,8 +1227,8 @@
           
           if (sourceImage) {
             await room.collection('gallery_images').update(sourceImage.id, {
-              uses: (sourceImage.uses || 0) + 1,
-              views: (sourceImage.views || 0) + 1
+              views: (sourceImage.views || 0) + 1,
+              uses: (sourceImage.uses || 0) + 1
             });
           }
           
@@ -1626,6 +1607,63 @@
         favoriteUsers.delete(username);
         localStorage.setItem('favoriteUsers', JSON.stringify([...favoriteUsers]));
         renderGallery();
+      }
+
+      async function generateImage() {
+        const prefixSelect = document.getElementById('prefixPrompt');
+        const promptInput = document.getElementById('promptInput');
+        const suffixSelect = document.getElementById('suffixPrompt');
+        const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+        
+        if (!promptInput.value.trim()) {
+          alert('Please enter a prompt!');
+          return;
+        }
+
+        const imageContainer = document.getElementById('imageContainer');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const placeholderText = document.getElementById('placeholderText');
+        const saveButton = document.getElementById('saveButton');
+        const addGalleryButton = document.getElementById('addGalleryButton');
+        const editorControls = document.getElementById('editorControls');
+
+        loadingSpinner.style.display = 'block';
+        placeholderText.style.display = 'none';
+        saveButton.style.display = 'none';
+        addGalleryButton.style.display = 'none';
+
+        const existingImages = imageContainer.querySelectorAll('img');
+        existingImages.forEach(img => img.remove());
+
+        const generatedImage = document.createElement('img');
+        generatedImage.id = `generatedImage_${Date.now()}`;
+        generatedImage.className = 'generated-image';
+        generatedImage.style.display = 'none';
+        generatedImage.crossOrigin = 'anonymous';
+        generatedImage.src = fullPrompt;
+        generatedImage.alt = fullPrompt;
+
+        imageContainer.appendChild(generatedImage);
+
+        generatedImage.onload = function() {
+          loadingSpinner.style.display = 'none';
+          generatedImage.style.display = 'block';
+          saveButton.style.display = 'block';
+          addGalleryButton.style.display = 'block';
+          currentImage = generatedImage;
+          setupImageEditor();
+        };
+
+        const tempImg = new Image();
+        tempImg.onload = async function() {
+          await room.collection('gallery_images').create({
+            prompt: fullPrompt,
+            imageUrl: tempImg.src,
+            views: 0,
+            uses: 0
+          });
+        };
+        tempImg.src = fullPrompt;
       }
 
       window.addEventListener('load', async () => {
