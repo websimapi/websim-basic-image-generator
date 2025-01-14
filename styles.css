@@ -51,7 +51,7 @@
   opacity: 1;
 }
 
-/* Gallery Image Styles */
+/* Styles for the gallery image div */
 .gallery-image {
   width: 100%;
   height: 200px;
@@ -61,7 +61,6 @@
   cursor: pointer;
 }
 
-/* Adjustments to .gallery-item if needed */
 .gallery-item {
   background: rgba(255,255,255,0.1);
   border-radius: 8px;
@@ -69,4 +68,16 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.gallery-item .metadata {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.8);
+}
+
+.gallery-item .stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
 }
