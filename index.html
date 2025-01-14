@@ -1382,19 +1382,14 @@
       ctx.save();
       
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = parseInt(document.getElementById('fontSize').value);
+      const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
-      // Set exact font size and family to match preview
       ctx.font = `${fontSize}px ${fontFamily}`;
       ctx.fillStyle = color;
       ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';  
       
-      // Get exact same scaling factor as preview
-      const scaleX = canvas.width / canvas.offsetWidth;
-      const scaleY = canvas.height / canvas.offsetHeight;
-      
-      // Apply text at correct position with proper scaling
       ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
       
       ctx.restore();
