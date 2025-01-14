@@ -22,11 +22,13 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 800px;
       width: 95%;
       text-align: center;
       padding: 10px;
-      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
     }
 
     h1 {
@@ -36,7 +38,7 @@
     }
 
     .input-group {
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
       display: flex;
       gap: 8px;
       justify-content: center;
@@ -89,11 +91,11 @@
     }
 
     .image-container {
-      margin: 1rem 0;
+      margin-top: 2rem;
       padding: 1rem;
       background: rgba(255,255,255,0.1);
       border-radius: 10px;
-      min-height: 200px;
+      min-height: 300px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -122,8 +124,8 @@
 
     .generated-image {
       max-width: 100%;
-      max-height: 400px;
-      object-fit: contain;
+      max-height: 500px;
+      border-radius: 5px;
     }
 
     .save-button {
@@ -184,7 +186,7 @@
 
     .tool-group {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.8rem;
       align-items: center;
       background: rgba(255,255,255,0.05);
       padding: 8px;
@@ -253,8 +255,8 @@
 
     canvas {
       max-width: 100%;
-      max-height: 400px;
-      object-fit: contain;
+      max-height: 500px;
+      border-radius: 5px;
       display: none;
     }
 
@@ -279,16 +281,16 @@
 
     .gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 0.8rem;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
       width: 100%;
       padding: 1rem;
     }
 
     .gallery-item {
-      padding: 0.8rem;
       background: rgba(255,255,255,0.1);
       border-radius: 8px;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -296,7 +298,7 @@
 
     .gallery-item img {
       width: 100%;
-      height: 150px;
+      height: 200px;
       object-fit: cover;
       border-radius: 4px;
       cursor: pointer;
@@ -362,61 +364,6 @@
       color: rgba(255,255,255,0.6);
       font-size: 1.1rem;
       grid-column: 1 / -1;
-    }
-
-    .text-preview {
-      position: fixed;  
-      pointer-events: none;
-      white-space: nowrap;
-      transform-origin: left top;
-      z-index: 1001;
-    }
-
-    .text-controls {
-      position: fixed;
-      background: rgba(0,0,0,0.8);
-      padding: 12px;
-      border-radius: 8px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      margin-top: 30px; 
-      max-width: 300px; 
-    }
-
-    .text-controls input[type="text"] {
-      width: 100%;
-      padding: 6px;
-      border: none;
-      border-radius: 4px;
-    }
-
-    .text-options {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      flex-wrap: wrap; 
-    }
-
-    .text-options select,
-    .text-options input {
-      padding: 4px;
-      border: none;
-      border-radius: 4px;
-      min-width: 0; 
-    }
-
-    .text-options input[type="number"] {
-      width: 50px;
-    }
-
-    .editor-section {
-      margin-bottom: 2rem;
-      padding: 1.5rem;
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
     }
 
     @media (max-width: 600px) {
@@ -515,9 +462,97 @@
       color: rgba(255,255,255,0.8);
     }
 
+    .editor-section {
+      margin-bottom: 3rem;
+      padding: 2rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+    }
+
+    .prompt-history {
+      margin: 8px 0;
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .prompt-history-header {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .prompt-history-header svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+      margin-left: 4px;
+    }
+
+    .prompt-history-entries {
+      display: none;
+      padding: 8px;
+    }
+
+    .prompt-history-entry {
+      padding: 4px;
+      border-left: 2px solid rgba(255,255,255,0.2);
+      margin: 4px 0;
+    }
+
+    .prompt-history-entry .timestamp {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .by-user {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .image-title {
+      font-weight: bold;
+      cursor: default;
+    }
+
+    .image-title[onclick] {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .edit-icon {
+      opacity: 0.5;
+      font-size: 0.8em;
+    }
+
+    .image-title[onclick]:hover .edit-icon {
+      opacity: 1;
+    }
+
     #editTitleDialog {
-      padding: 15px;
-      max-width: 300px;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #2a2a3a;
+      padding: 20px;
+      border-radius: 8px;
+      z-index: 1001;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .dialog-content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .dialog-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
     }
   </style>
 </head>
@@ -581,19 +616,13 @@
 
             <button class="tool-button" onclick="setTool('fillWithImage')" id="fillWithImageTool" data-tooltip="Fill with Generated Image">
               <svg viewBox="0 0 24 24">
-                <path d="M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29M21.4,11.6L24,14.2L21.4,16.8L18.8,14.2L21.4,11.6M0,18L3,21L5.6,18.4L2.6,15.4L0,18Z"/>
+                <path d="M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
               </svg>
             </button>
 
             <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool" data-tooltip="Clear Selection">
               <svg viewBox="0 0 24 24">
                 <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-              </svg>
-            </button>
-
-            <button class="tool-button" onclick="setTool('text')" id="textTool" data-tooltip="Add Text">
-              <svg viewBox="0 0 24 24">
-                <path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.33,18 15,18V19H9V18C9.67,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"/>
               </svg>
             </button>
 
@@ -616,23 +645,6 @@
       <div class="action-buttons">
         <button onclick="saveImage()" class="save-button" id="saveButton">Save Image</button>
         <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton">Add to Gallery</button>
-      </div>
-    </div>
-
-    <div id="textControls" class="text-controls" style="display: none;">
-      <input type="text" id="textInput" placeholder="Enter text...">
-      <div class="text-options">
-        <select id="fontFamily">
-          <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Verdana">Verdana</option>
-        </select>
-        <input type="number" id="fontSize" value="24" min="8" max="72">
-        <input type="color" id="textColor" value="#000000">
-        <button onclick="commitText()">Apply</button>
-        <button onclick="cancelText()">Cancel</button>
       </div>
     </div>
 
@@ -685,8 +697,6 @@
     let isCtrlPressed = false;
     let selectionCanvas = null;
     let selectionCtx = null;
-    let currentTextPosition = null;
-    let textPreview = null;
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
@@ -841,20 +851,14 @@
 
     function handleCanvasClick(e) {
       const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) * (canvas.width / rect.width);
       const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-      const activeTool = document.querySelector('.tool-button.active');
-      if (activeTool && activeTool.id === 'textTool') {
-        handleTextTool(e.clientX, e.clientY, x, y);
-        return;
-      }
-
       if (!isShiftPressed && !isCtrlPressed) {
         currentSelection = null;
       }
-      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
       if (isShiftPressed || isCtrlPressed) {
         if (currentSelection) {
@@ -929,7 +933,6 @@
     function setTool(tool) {
       const canvas = document.getElementById('editCanvas');
       const fillImagePrompt = document.getElementById('fillImagePrompt');
-      const textControls = document.getElementById('textControls');
       
       document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
       
@@ -946,13 +949,10 @@
         setSelectionAlpha();
       } else if (tool === 'fillWithImage' && currentSelection) {
         fillImagePrompt.style.display = 'flex';
-      } else if (tool === 'text') {
-        canvas.style.cursor = 'text';
       } else {
         fillImagePrompt.style.display = 'none';
-        textControls.style.display = 'none';
-        canvas.style.cursor = tool === 'magicWand' ? 'crosshair' : 'default';
       }
+      canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
     }
 
     function fillSelection() {
@@ -1074,7 +1074,7 @@
       const promptInput = document.getElementById('promptInput');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
+      
       const imageContainer = document.getElementById('imageContainer');
       const loadingSpinner = document.getElementById('loadingSpinner');
       const placeholderText = document.getElementById('placeholderText');
@@ -1304,115 +1304,6 @@
       document.body.appendChild(generatedImage);
     }
 
-    function handleTextTool(clientX, clientY, canvasX, canvasY) {
-      const textControls = document.getElementById('textControls');
-      const canvas = document.getElementById('editCanvas');
-      const rect = canvas.getBoundingClientRect();
-      
-      // Remove existing preview
-      if (textPreview) {
-        textPreview.remove();
-      }
-      
-      // Create new preview at click position
-      textPreview = document.createElement('div');
-      textPreview.className = 'text-preview';
-      textPreview.style.position = 'fixed';
-      textPreview.style.left = `${clientX}px`;
-      textPreview.style.top = `${clientY}px`;
-      document.body.appendChild(textPreview);
-      
-      // Position controls below preview
-      const controlsHeight = 100; 
-      const controlsWidth = 250;  
-      
-      let top = clientY + 30; 
-      let left = clientX;
-      
-      // Adjust vertical position if too close to bottom
-      if (top + controlsHeight > window.innerHeight) {
-        top = window.innerHeight - controlsHeight - 10;
-      }
-      
-      // Adjust horizontal position if too close to right edge
-      if (left + controlsWidth > window.innerWidth) {
-        left = window.innerWidth - controlsWidth - 10;
-      }
-      
-      textControls.style.display = 'flex';
-      textControls.style.left = `${left}px`;
-      textControls.style.top = `${top}px`;
-      
-      // Store exact canvas coordinates for text placement
-      currentTextPosition = { x: canvasX, y: canvasY };
-      
-      const textInput = document.getElementById('textInput');
-      textInput.focus();
-      
-      updateTextPreview();
-    }
-
-    function updateTextPreview() {
-      if (!textPreview || !currentTextPosition) return;
-      
-      const text = document.getElementById('textInput').value;
-      const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
-      const color = document.getElementById('textColor').value;
-      
-      textPreview.style.fontFamily = fontFamily;
-      textPreview.style.fontSize = `${fontSize}px`;
-      textPreview.style.color = color;
-      textPreview.style.pointerEvents = 'none';
-      textPreview.textContent = text || 'Enter text...';
-    }
-
-    function commitText() {
-      if (!currentTextPosition) return;
-
-      const canvas = document.getElementById('editCanvas');
-      const ctx = canvas.getContext('2d');
-      const text = document.getElementById('textInput').value;
-
-      if (!text.trim()) {
-        cancelText();
-        return;
-      }
-
-      const fontFamily = document.getElementById('fontFamily').value;
-      const fontSizeValue = document.getElementById('fontSize').value;
-      const fontSize = parseInt(fontSizeValue, 10);
-      const color = document.getElementById('textColor').value;
-
-      ctx.save();
-
-      ctx.font = `${fontSize}px "${fontFamily}"`;
-      ctx.fillStyle = color;
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'left';  
-
-      ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
-
-      ctx.restore();
-
-      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      cancelText();
-    }
-
-    function cancelText() {
-      const textControls = document.getElementById('textControls');
-      textControls.style.display = 'none';
-      document.getElementById('textInput').value = '';
-      
-      if (textPreview) {
-        textPreview.remove();
-        textPreview = null;
-      }
-      
-      currentTextPosition = null;
-    }
-
     document.addEventListener('keydown', function (e) {
       if (e.shiftKey) isShiftPressed = true;
       if (e.ctrlKey) isCtrlPressed = true;
@@ -1587,11 +1478,6 @@
 
     document.getElementById('colorPreview').style.backgroundColor = document.getElementById('colorPicker').value;
     document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();
-
-    document.getElementById('textInput').addEventListener('input', updateTextPreview);
-    document.getElementById('fontFamily').addEventListener('change', updateTextPreview);
-    document.getElementById('fontSize').addEventListener('input', updateTextPreview);
-    document.getElementById('textColor').addEventListener('input', updateTextPreview);
   </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
