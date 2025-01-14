@@ -565,6 +565,7 @@
       flex-direction: column;
       gap: 10px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      margin-top: 40px;
     }
 
     .text-controls input[type="text"] {
@@ -596,6 +597,8 @@
       pointer-events: none;
       white-space: nowrap;
       transform-origin: left top;
+      transform: scale(1);
+      z-index: 999;
     }
   </style>
 </head>
@@ -1383,10 +1386,16 @@
     }
 
     function handleTextTool(clientX, clientY, canvasX, canvasY) {
+      const canvas = document.getElementById('editCanvas');
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      // Position controls below the text
       const textControls = document.getElementById('textControls');
       textControls.style.display = 'flex';
       textControls.style.left = `${clientX}px`;
-      textControls.style.top = `${clientY}px`;
+      textControls.style.top = `${clientY + 30}px`; // Position below click point
       
       currentTextPosition = { x: canvasX, y: canvasY };
       
@@ -1401,6 +1410,10 @@
       textPreview.className = 'text-preview';
       textPreview.style.left = `${clientX}px`;
       textPreview.style.top = `${clientY}px`;
+      
+      // Scale preview to match canvas
+      textPreview.style.transform = `scale(${1/scaleX}, ${1/scaleY})`;
+      
       document.body.appendChild(textPreview);
       
       updateTextPreview();
@@ -1409,15 +1422,21 @@
     function updateTextPreview() {
       if (!textPreview || !currentTextPosition) return;
       
+      const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
       const text = document.getElementById('textInput').value;
       const fontFamily = document.getElementById('fontFamily').value;
       const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
+      // Update preview style
       textPreview.textContent = text || 'Enter text...';
       textPreview.style.fontFamily = fontFamily;
       textPreview.style.fontSize = `${fontSize}px`;
       textPreview.style.color = color;
+      
+      // Also set canvas context font to ensure measurements match
+      ctx.font = `${fontSize}px ${fontFamily}`;
     }
 
     function commitText() {
@@ -1438,6 +1457,7 @@
       const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
+      // Set the exact same font as preview
       ctx.font = `${fontSize}px ${fontFamily}`;
       ctx.fillStyle = color;
       ctx.textBaseline = 'top';
