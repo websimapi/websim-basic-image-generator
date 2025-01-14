@@ -793,12 +793,16 @@
     async function loadGalleryImage(id) {
       const image = galleryImages.find(img => img.id === id);
       if (!image) return;
+      
       await room.collection('gallery_images').update(id, {
-        views: (image.views || 0) + 1
+        views: (image.views || 0) + 1,
+        uses: (image.uses || 0) + 1
       });
+      
       const imageContainer = document.getElementById('imageContainer');
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
+      
       const generatedImage = document.createElement('img');
       generatedImage.id = `generatedImage_${Date.now()}`;
       generatedImage.className = 'generated-image';
@@ -806,10 +810,12 @@
       generatedImage.crossOrigin = 'anonymous';
       generatedImage.src = image.imageUrl;
       generatedImage.alt = image.prompt;
+      
       imageContainer.appendChild(generatedImage);
       currentImage = generatedImage;
       document.getElementById('saveButton').style.display = 'block';
       document.getElementById('addGalleryButton').style.display = 'block';
+      
       currentImage.onload = function () {
         setupImageEditor();
       };
@@ -1015,29 +1021,35 @@
       const prefixSelect = document.getElementById('prefixPrompt');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
+      
       try {
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png');
+        const sourceImage = galleryImages.find(img => 
+          img.imageUrl === currentImage.src
+        );
+        
+        if (sourceImage) {
+          await room.collection('gallery_images').update(sourceImage.id, {
+            uses: (sourceImage.uses || 0) + 1
+          });
+        }
+        
+        const promptHistory = sourceImage ? 
+          [...(sourceImage.promptHistory || [{
+            prompt: sourceImage.prompt,
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
+          }])] : [];
+        
+        promptHistory.push({
+          prompt: fullPrompt,
+          timestamp: new Date().toISOString(),
+          username: room.party.client.username
         });
-
+        
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         const file = new File([blob], 'edited-image.png', { type: 'image/png' });
         const imageUrl = await websim.upload(file);
-
-        const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
-
-        const promptHistory = sourceImage ? 
-          [...(sourceImage.promptHistory || []), {
-            prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            username: room.party.client.username,
-            type: 'modified'
-          }] : [{
-            prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            username: room.party.client.username
-          }];
-
+        
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           title: fullPrompt,
@@ -1046,11 +1058,11 @@
           uses: 0,
           modified: true,
           promptHistory: promptHistory,
-          sourceImageId: sourceImage?.id,
-          username: room.party.client.username
+          sourceImageId: sourceImage?.id
         });
-
+        
         alert('Image added to gallery successfully!');
+        
       } catch (error) {
         console.error('Error adding to gallery:', error);
         alert('Failed to add image to gallery. Please try again.');
@@ -1062,11 +1074,12 @@
       const promptInput = document.getElementById('promptInput');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
+      
       const imageContainer = document.getElementById('imageContainer');
       const loadingSpinner = document.getElementById('loadingSpinner');
       const placeholderText = document.getElementById('placeholderText');
       const saveButton = document.getElementById('saveButton');
+      const editorControls = document.getElementById('editorControls');
       const addGalleryButton = document.getElementById('addGalleryButton');
 
       if (!promptInput.value.trim()) {
@@ -1090,33 +1103,36 @@
       generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
+      const initialSrc = generatedImage.src;
+      
       generatedImage.onload = async function() {
-        loadingSpinner.style.display = 'none';
-        generatedImage.style.display = 'block';
-        placeholderText.style.display = 'none';
-        saveButton.style.display = 'block';
-        addGalleryButton.style.display = 'block';
-        currentImage = generatedImage;
-
-        try {
-          await room.collection('gallery_images').create({
-            prompt: fullPrompt,
-            title: fullPrompt,
-            imageUrl: generatedImage.src,
-            views: 0,
-            uses: 0,
-            promptHistory: [{
+        if (generatedImage.src !== initialSrc) {
+          loadingSpinner.style.display = 'none';
+          generatedImage.style.display = 'block';
+          placeholderText.style.display = 'none';
+          saveButton.style.display = 'block';
+          addGalleryButton.style.display = 'block';
+          currentImage = generatedImage;
+          
+          try {
+            await room.collection('gallery_images').create({
               prompt: fullPrompt,
-              timestamp: new Date().toISOString(),
-              username: room.party.client.username
-            }],
-            username: room.party.client.username
-          });
-
-          setupImageEditor();
-        } catch (error) {
-          console.error('Error processing generated image:', error);
-          alert('Failed to process generated image. Please try again.');
+              imageUrl: generatedImage.src, 
+              views: 0,
+              uses: 0,
+              promptHistory: [{
+                prompt: fullPrompt,
+                timestamp: new Date().toISOString(),
+                username: room.party.client.username
+              }]
+            });
+            
+            setupImageEditor();
+            
+          } catch (error) {
+            console.error('Error processing generated image:', error);
+            alert('Failed to process generated image. Please try again.');
+          }
         }
       };
 
@@ -1162,7 +1178,7 @@
         alert('Please make a selection first');
         return;
       }
-
+      
       const prompt = document.getElementById('selectionPromptInput').value.trim();
       if (!prompt) {
         alert('Please enter a prompt for the selected region');
@@ -1181,12 +1197,13 @@
       generatedImage.id = tempId;
       generatedImage.crossOrigin = 'anonymous';
       generatedImage.style.display = 'none';
+      
       generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
       generatedImage.onload = async function() {
         loadingSpinner.style.display = 'none';
-
+        
         const canvas = document.getElementById('editCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -1211,13 +1228,14 @@
         const tempCtx = tempCanvas.getContext('2d');
         const selectionWidth = maxX - minX + 1;
         const selectionHeight = maxY - minY + 1;
-
+        
         tempCanvas.width = selectionWidth;
         tempCanvas.height = selectionHeight;
-
+        
         tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
-
+        
         const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
+        
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pixels = imageData.data;
 
@@ -1229,7 +1247,7 @@
               const scaledY = y - minY;
               const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
               const targetPos = pos * 4;
-
+              
               pixels[targetPos] = scaledImageData.data[scaledPos];
               pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
               pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
@@ -1241,39 +1259,44 @@
         ctx.putImageData(imageData, 0, 0);
         originalImageData = imageData;
 
-        const sourceImage = galleryImages.find(img =>
+        const sourceImage = galleryImages.find(img => 
           img.imageUrl === currentImage.src
         );
-
-        let promptHistory = sourceImage ?
-          [...(sourceImage.promptHistory || []), {
+        
+        if (sourceImage) {
+          await room.collection('gallery_images').update(sourceImage.id, {
+            uses: (sourceImage.uses || 0) + 1
+          });
+          
+          let promptHistory = [...(sourceImage.promptHistory || [{
+            prompt: sourceImage.prompt,
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
+          }])];
+          
+          promptHistory.push({
             prompt: fullPrompt,
             timestamp: new Date().toISOString(),
-            username: room.party.client.username,
-            type: 'selection-fill'
-          }] : [{
+            type: 'selection-fill',
+            username: room.party.client.username
+          });
+          
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+          const imageUrl = await websim.upload(file);
+          
+          await room.collection('gallery_images').create({
             prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            username: room.party.client.username,
-            type: 'selection-fill'
-          }];
-
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-        const imageUrl = await websim.upload(file);
-
-        await room.collection('gallery_images').create({
-          prompt: fullPrompt,
-          title: fullPrompt,
-          imageUrl: imageUrl,
-          views: 0,
-          uses: 0,
-          modified: true,
-          promptHistory: promptHistory,
-          sourceImageId: sourceImage?.id,
-          username: room.party.client.username
-        });
-
+            title: fullPrompt,
+            imageUrl: imageUrl,
+            views: 0,
+            uses: 0,
+            modified: true,
+            promptHistory: promptHistory,
+            sourceImageId: sourceImage.id
+          });
+        }
+        
         document.getElementById('fillImagePrompt').style.display = 'none';
         generatedImage.remove();
       };
@@ -1378,7 +1401,7 @@
                   ${index === 0 ? 'Original prompt: ' : entry.type === 'selection-fill' ? 'Selection fill: ' : 'Modified with: '}
                   ${entry.prompt}
                 </div>
-                <div class="by-user">by ${index === 0 ? image.username : entry.username}</div>
+                <div class="by-user">by ${entry.username || image.username}</div>
                 <div class="timestamp">${new Date(entry.timestamp).toLocaleString()}</div>
               </div>
             `).join('')}
