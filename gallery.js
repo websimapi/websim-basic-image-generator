@@ -17,6 +17,7 @@ async function initGallery() {
   renderGallery();
 }
 
+// Render gallery with pagination
 function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
@@ -64,9 +65,26 @@ function renderGallery() {
     <div class="gallery-item">
       <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
-        <div>${img.prompt}</div>
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <div class="prompt-history">
+          <details>
+            <summary>Prompt History</summary>
+            <ol>
+              ${(img.promptHistory || []).map((entry, i) => `
+                <li>
+                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
+                  ${entry.prompt}
+                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+                </li>
+              `).join('')}
+            </ol>
+          </details>
+        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -74,7 +92,7 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
@@ -122,40 +140,21 @@ async function loadGalleryImage(id) {
   };
 }
 
-function editImage(id) {
+async function editTitle(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
-  currentEditId = id;
-  const dialog = document.getElementById('editPromptDialog');
-  const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editPromptInput');
-  input.value = image.prompt;
-  dialog.style.display = 'block';
-  overlay.style.display = 'block';
-}
-
-async function saveEdit() {
-  if (!currentEditId) return;
-  const input = document.getElementById('editPromptInput');
-  const newPrompt = input.value.trim();
-  if (!newPrompt) {
-    alert('Please enter a prompt');
-    return;
+  
+  const newTitle = prompt('Enter new title:', image.title || 'Untitled');
+  if (newTitle === null) return; // User canceled
+  
+  try {
+    await room.collection('gallery_images').update(id, {
+      title: newTitle
+    });
+  } catch (err) {
+    console.error('Failed to update title:', err);
+    alert('Failed to update title');
   }
-  await room.collection('gallery_images').update(currentEditId, {
-    prompt: newPrompt
-  });
-  cancelEdit();
-}
-
-function cancelEdit() {
-  currentEditId = null;
-  const dialog = document.getElementById('editPromptDialog');
-  const overlay = document.getElementById('overlay');
-  const input = document.getElementById('editPromptInput');
-  input.value = '';
-  dialog.style.display = 'none';
-  overlay.style.display = 'none';
 }
 
 async function deleteImage(id) {
