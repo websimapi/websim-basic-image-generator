@@ -1317,13 +1317,14 @@
       // Create new preview at click position
       textPreview = document.createElement('div');
       textPreview.className = 'text-preview';
+      textPreview.style.position = 'fixed';
       textPreview.style.left = `${clientX}px`;
       textPreview.style.top = `${clientY}px`;
       document.body.appendChild(textPreview);
       
       // Position controls below preview
-      const controlsHeight = 150; 
-      const controlsWidth = 300;  
+      const controlsHeight = 100; 
+      const controlsWidth = 250;  
       
       let top = clientY + 30; 
       let left = clientX;
@@ -1342,6 +1343,7 @@
       textControls.style.left = `${left}px`;
       textControls.style.top = `${top}px`;
       
+      // Store exact canvas coordinates for text placement
       currentTextPosition = { x: canvasX, y: canvasY };
       
       const textInput = document.getElementById('textInput');
@@ -1353,23 +1355,16 @@
     function updateTextPreview() {
       if (!textPreview || !currentTextPosition) return;
       
-      const canvas = document.getElementById('editCanvas');
-      const rect = canvas.getBoundingClientRect();
-      const scale = canvas.width / rect.width;
-      
       const text = document.getElementById('textInput').value;
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = parseInt(document.getElementById('fontSize').value);
+      const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
-      // Use the actual font size for preview
-      textPreview.textContent = text || 'Enter text...';
       textPreview.style.fontFamily = fontFamily;
       textPreview.style.fontSize = `${fontSize}px`;
       textPreview.style.color = color;
-      
-      // Scale the preview to match canvas size
-      textPreview.style.transform = `scale(${1/scale})`;
+      textPreview.style.pointerEvents = 'none';
+      textPreview.textContent = text || 'Enter text...';
     }
 
     function commitText() {
@@ -1387,7 +1382,7 @@
       ctx.save();
       
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = parseInt(document.getElementById('fontSize').value);
+      const fontSize = document.getElementById('fontSize').value;
       const color = document.getElementById('textColor').value;
       
       ctx.font = `${fontSize}px ${fontFamily}`;
@@ -1399,56 +1394,82 @@
       ctx.restore();
       
       originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      // Create text modification history entry
-      const sourceImage = galleryImages.find(img => 
-        img.imageUrl === currentImage.src
-      );
-
-      if (sourceImage) {
-        room.collection('gallery_images').update(sourceImage.id, {
-          uses: (sourceImage.uses || 0) + 1
-        });
-
-        let promptHistory = [...(sourceImage.promptHistory || [{
-          prompt: sourceImage.prompt,
-          timestamp: sourceImage.created_at,
-          username: sourceImage.username
-        }])];
-
-        promptHistory.push({
-          prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
-          timestamp: new Date().toISOString(),
-          type: 'text-modification',
-          username: room.party.client.username,
-          textDetails: {
-            text,
-            fontFamily,
-            fontSize,
-            color,
-            x: currentTextPosition.x,
-            y: currentTextPosition.y
-          }
-        });
-
-        canvas.toBlob(async (blob) => {
-          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-          const imageUrl = await websim.upload(file);
-          
-          await room.collection('gallery_images').create({
-            prompt: sourceImage.prompt,
-            title: sourceImage.title || sourceImage.prompt,
-            imageUrl: imageUrl,
-            views: 0,
-            uses: 0,
-            modified: true,
-            promptHistory: promptHistory,
-            sourceImageId: sourceImage.id
-          });
-        }, 'image/png');
-      }
       
       cancelText();
+    }
+
+    function cancelText() {
+      const textControls = document.getElementById('textControls');
+      textControls.style.display = 'none';
+      document.getElementById('textInput').value = '';
+      
+      if (textPreview) {
+        textPreview.remove();
+        textPreview = null;
+      }
+      
+      currentTextPosition = null;
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.shiftKey) isShiftPressed = true;
+      if (e.ctrlKey) isCtrlPressed = true;
+    });
+
+    document.addEventListener('keyup', function (e) {
+      if (!e.shiftKey) isShiftPressed = false;
+      if (!e.ctrlKey) isCtrlPressed = false;
+    });
+
+    function editImage(id) {
+      const image = galleryImages.find(img => img.id === id);
+      if (!image) return;
+      currentEditId = id;
+      const dialog = document.getElementById('editPromptDialog');
+      const overlay = document.getElementById('overlay');
+      const input = document.getElementById('editPromptInput');
+      input.value = image.prompt;
+      dialog.style.display = 'block';
+      overlay.style.display = 'block';
+    }
+
+    async function saveEdit() {
+      if (!currentEditId) return;
+      
+      const input = document.getElementById('editPromptInput');
+      const newPrompt = input.value.trim();
+      
+      if (!newPrompt) {
+        alert('Please enter a prompt');
+        return;
+      }
+      
+      await room.collection('gallery_images').update(currentEditId, {
+        prompt: newPrompt
+      });
+      
+      cancelEdit();
+    }
+
+    function cancelEdit() {
+      currentEditId = null;
+      const dialog = document.getElementById('editPromptDialog');
+      const overlay = document.getElementById('overlay');
+      const input = document.getElementById('editPromptInput');
+      input.value = '';
+      dialog.style.display = 'none';
+      overlay.style.display = 'none';
+    }
+
+    async function deleteImage(id) {
+      if (!confirm('Are you sure you want to delete this image?')) return;
+      await room.collection('gallery_images').delete(id);
+    }
+
+    function filterGallery() {
+      const searchInput = document.getElementById('gallerySearch');
+      currentSearch = searchInput.value.trim();
+      renderGallery();
     }
 
     function renderPromptHistory(image) {
@@ -1484,10 +1505,7 @@
             ${image.promptHistory.map((entry, index) => `
               <div class="prompt-history-entry">
                 <div>
-                  ${index === 0 ? 'Original prompt: ' : 
-                    entry.type === 'selection-fill' ? 'Selection fill: ' : 
-                    entry.type === 'text-modification' ? '' : 
-                    'Modified with: '}
+                  ${index === 0 ? 'Original prompt: ' : entry.type === 'selection-fill' ? 'Selection fill: ' : 'Modified with: '}
                   ${entry.prompt}
                 </div>
                 <div class="by-user">by ${entry.username || image.username}</div>
