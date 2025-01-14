@@ -8,7 +8,7 @@ let currentImage = null;
 let currentPage = 1;
 const itemsPerPage = 10;
 
-export async function initGallery() {
+async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
     galleryImages = images;
@@ -82,11 +82,11 @@ function renderGallery() {
   `).join('');
 }
 
-export async function handleGalleryTab(tab) {
+async function showGalleryTab(tab) {
   currentTab = tab;
-  currentPage = 1;
+  currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === tab);
+    el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
   renderGallery();
 }
@@ -163,14 +163,14 @@ async function deleteImage(id) {
   await room.collection('gallery_images').delete(id);
 }
 
-export function filterGallery() {
+function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
   currentSearch = searchInput.value.trim();
   currentPage = 1; // Reset to first page when filtering
   renderGallery();
 }
 
-export function changePage(delta) {
+function changePage(delta) {
   const newPage = currentPage + delta;
   const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
   
