@@ -1369,33 +1369,34 @@
 
     function commitText() {
       if (!currentTextPosition) return;
-      
+
       const canvas = document.getElementById('editCanvas');
       const ctx = canvas.getContext('2d');
       const text = document.getElementById('textInput').value;
-      
+
       if (!text.trim()) {
         cancelText();
         return;
       }
-      
-      ctx.save();
-      
+
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
+      const fontSizeValue = document.getElementById('fontSize').value;
+      const fontSize = parseInt(fontSizeValue, 10);
       const color = document.getElementById('textColor').value;
-      
-      ctx.font = `${fontSize}px ${fontFamily}`;
+
+      ctx.save();
+
+      ctx.font = `${fontSize}px "${fontFamily}"`;
       ctx.fillStyle = color;
       ctx.textBaseline = 'top';
       ctx.textAlign = 'left';  
-      
+
       ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
-      
+
       ctx.restore();
-      
+
       originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
+
       cancelText();
     }
 
