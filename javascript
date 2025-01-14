@@ -64,11 +64,35 @@ function renderGallery() {
 
   galleryEl.innerHTML = paginatedImages.map(img => `
     <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div 
+        class="gallery-item-image" 
+        id="gallery-image-${img.id}"
+        onclick="loadGalleryImage('${img.id}')"
+        style="background-image: url('${img.imageUrl}')"
+        role="img"
+        aria-label="${img.prompt}"
+      ></div>
       <div class="metadata">
-        <div>${img.prompt}</div>
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <div class="prompt-history">
+          <details>
+            <summary>Prompt History</summary>
+            <ol>
+              ${(img.promptHistory || []).map((entry, i) => `
+                <li>
+                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
+                  ${entry.prompt}
+                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+                </li>
+              `).join('')}
+            </ol>
+          </details>
+        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -76,12 +100,13 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
+  
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
@@ -597,14 +622,14 @@ document.addEventListener('keyup', function (e) {
   if (!e.ctrlKey) isCtrlPressed = false;
 });
 
-function editImage(id) {
+function editTitle(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
-  input.value = image.prompt;
+  input.value = image.title || 'Untitled';
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
@@ -614,11 +639,11 @@ async function saveEdit() {
   const input = document.getElementById('editPromptInput');
   const newPrompt = input.value.trim();
   if (!newPrompt) {
-    alert('Please enter a prompt');
+    alert('Please enter a title');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    prompt: newPrompt
+    title: newPrompt
   });
   cancelEdit();
 }

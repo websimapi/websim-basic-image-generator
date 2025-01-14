@@ -3,7 +3,6 @@
   <base href="./">
   <title>AI Image Editor</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://unpkg.com/websim-socket/websimSocket.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -509,7 +508,7 @@
         <div id="loadingSpinner" class="loading" style="display: none;"></div>
         <div id="placeholderText" class="placeholder-text">Enter a prompt to generate an image or load one from your device</div>
         <canvas id="editCanvas"></canvas>
-        <div class="editor-controls" id="editorControls" style="display: none;">
+        <div class="editor-controls" id="editorControls">
           <div class="tool-group">
             <button class="tool-button" onclick="setTool('magicWand')" id="magicWandTool" data-tooltip="Magic Wand">
               <svg viewBox="0 0 24 24">
@@ -555,11 +554,11 @@
           
           <button onclick="resetImage()">Reset Image</button>
         </div>
+      </div>
 
-        <div class="action-buttons">
-          <button onclick="saveImage()" class="save-button" id="saveButton" style="display: none;">Save Image</button>
-          <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton" style="display: none;">Add to Gallery</button>
-        </div>
+      <div class="action-buttons">
+        <button onclick="saveImage()" class="save-button" id="saveButton">Save Image</button>
+        <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton">Add to Gallery</button>
       </div>
     </div>
 
@@ -577,9 +576,7 @@
           </svg>
         </div>
       </div>
-      <div id="gallery" class="gallery">
-        <!-- Gallery items will be inserted here -->
-      </div>
+      <div id="gallery" class="gallery"></div>
       <div class="gallery-pagination" id="galleryPagination">
         <button onclick="changePage(-1)" class="pagination-button" id="prevPage">Previous</button>
         <span id="pageInfo">Page 1 of 1</span>
@@ -588,8 +585,6 @@
     </div>
   </div>
 
-  <script src="gallery.js"></script>
-  <script src="imageEditor.js"></script>
   <script>
     let room;
     let galleryImages = [];
