@@ -81,3 +81,13 @@
   font-size: 0.8rem;
   color: rgba(255,255,255,0.6);
 }
+
+.container {
+  max-width: 800px;
+  width: 95%;
+  text-align: center;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}

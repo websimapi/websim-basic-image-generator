@@ -1,4 +1,3 @@
-let imageCounter = 0;
 let currentImage = null;
 let originalImageData = null;
 let currentSelection = null;
@@ -28,11 +27,10 @@ function setupImageEditor() {
     editorControls.style.display = 'flex';
   } else {
     canvas.style.display = 'none';
-    editorControls.style.display = 'flex';
+    editorControls.style.display = 'none';
   }
-
   fillImagePrompt.style.display = 'none';
-  
+
   if (!canvas.hasEventListener) {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.hasEventListener = true;
@@ -74,33 +72,33 @@ function magicWandSelect(imageData, startX, startY, tolerance) {
   const pixels = imageData.data;
   const visited = new Uint8Array(width * height);
   const selected = new Uint8Array(width * height);
-  
+
   const startPos = (startY * width + startX) * 4;
   const startR = pixels[startPos];
   const startG = pixels[startPos + 1];
   const startB = pixels[startPos + 2];
-  
+
   const stack = [[startX, startY]];
-  
+
   while (stack.length) {
     const [x, y] = stack.pop();
     const pos = y * width + x;
-    
+
     if (x < 0 || x >= width || y < 0 || y >= height || visited[pos]) {
       continue;
     }
-    
+
     const pixelPos = pos * 4;
     const r = pixels[pixelPos];
     const g = pixels[pixelPos + 1];
     const b = pixels[pixelPos + 2];
-    
+
     const colorDiff = Math.sqrt(
       Math.pow(r - startR, 2) + 
       Math.pow(g - startG, 2) + 
       Math.pow(b - startB, 2)
     );
-    
+
     if (colorDiff <= tolerance) {
       visited[pos] = 1;
       selected[pos] = 1;
@@ -112,23 +110,24 @@ function magicWandSelect(imageData, startX, startY, tolerance) {
       );
     }
   }
-  
+
   return selected;
 }
 
 function drawSelectionOverlay() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
-  
+
   ctx.putImageData(originalImageData, 0, 0);
-  
+
   if (!currentSelection) return;
-  
+
   const width = canvas.width;
   const height = canvas.height;
-  
+
   ctx.strokeStyle = 'white';
   ctx.lineWidth = 2;
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pos = y * width + x;
