@@ -259,6 +259,64 @@ button:hover {
   background: #9c27b0;
 }
 
+/* Prompt History */
+.prompt-history {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.prompt-history-header {
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.1);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.prompt-history-header:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.prompt-history-entries {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.prompt-history.expanded .prompt-history-entries {
+  max-height: 500px;
+}
+
+.prompt-history-entry {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.prompt-history-entry:last-child {
+  border-bottom: none;
+}
+
+.prompt-history-entry .by-user {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+}
+
+.expand-icon {
+  transform: rotate(0deg);
+  transition: transform 0.3s ease;
+}
+
+.prompt-history.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
 /* Responsive Design */
 @media (max-width: 600px) {
   body {

@@ -475,6 +475,24 @@
       color: rgba(255,255,255,0.7);
     }
 
+    .prompt-history-header {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .prompt-history-header svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+      margin-left: 4px;
+    }
+
+    .prompt-history-entries {
+      display: none;
+      padding: 8px;
+    }
+
     .prompt-history-entry {
       padding: 4px;
       border-left: 2px solid rgba(255,255,255,0.2);
@@ -482,6 +500,11 @@
     }
 
     .prompt-history-entry .timestamp {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .by-user {
       font-size: 0.8rem;
       color: rgba(255,255,255,0.5);
     }
@@ -1009,14 +1032,16 @@
         const promptHistory = sourceImage ? 
           [...(sourceImage.promptHistory || [{
             prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
           }])] : [];
         
         promptHistory.push({
           prompt: fullPrompt,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          username: room.party.client.username
         });
-        
+
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           title: fullPrompt, 
@@ -1089,7 +1114,8 @@
               uses: 0,
               promptHistory: [{
                 prompt: fullPrompt,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                username: room.party.client.username
               }]
             });
             
@@ -1232,13 +1258,15 @@
         let promptHistory = sourceImage ? 
           [...(sourceImage.promptHistory || [{
             prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
           }])] : [];
         
         promptHistory.push({
           prompt: fullPrompt,
           timestamp: new Date().toISOString(),
-          type: 'selection-fill'
+          type: 'selection-fill',
+          username: room.party.client.username
         });
         
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -1326,16 +1354,58 @@
 
     function renderPromptHistory(image) {
       if (!image.promptHistory || !image.promptHistory.length) {
-        return `<div class="prompt-history-entry">Original prompt: ${image.prompt}</div>`;
+        return `
+          <div class="prompt-history">
+            <div class="prompt-history-header" onclick="togglePromptHistory(this)">
+              <span>Prompt History (1)</span>
+              <svg class="expand-icon" width="12" height="12" viewBox="0 0 12 12">
+                <path fill="currentColor" d="M6 8L2 4h8z"/>
+              </svg>
+            </div>
+            <div class="prompt-history-entries" style="display: block;">
+              <div class="prompt-history-entry">
+                <div>Original prompt: ${image.prompt}</div>
+                <div class="by-user">by ${image.username}</div>
+                <div class="timestamp">${new Date(image.created_at).toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+        `;
       }
 
-      return image.promptHistory.map((entry, index) => `
-        <div class="prompt-history-entry">
-          ${index === 0 ? 'Original prompt: ' : 'Modified with: '}
-          ${entry.prompt}
-          <div class="timestamp">${new Date(entry.timestamp).toLocaleString()}</div>
+      return `
+        <div class="prompt-history">
+          <div class="prompt-history-header" onclick="togglePromptHistory(this)">
+            <span>Prompt History (${image.promptHistory.length})</span>
+            <svg class="expand-icon" width="12" height="12" viewBox="0 0 12 12">
+              <path fill="currentColor" d="M6 8L2 4h8z"/>
+            </svg>
+          </div>
+          <div class="prompt-history-entries">
+            ${image.promptHistory.map((entry, index) => `
+              <div class="prompt-history-entry">
+                <div>
+                  ${index === 0 ? 'Original prompt: ' : entry.type === 'selection-fill' ? 'Selection fill: ' : 'Modified with: '}
+                  ${entry.prompt}
+                </div>
+                <div class="by-user">by ${entry.username || image.username}</div>
+                <div class="timestamp">${new Date(entry.timestamp).toLocaleString()}</div>
+              </div>
+            `).join('')}
+          </div>
         </div>
-      `).join('');
+      `;
+    }
+
+    function togglePromptHistory(header) {
+      const historyDiv = header.parentElement;
+      historyDiv.classList.toggle('expanded');
+      const entriesDiv = historyDiv.querySelector('.prompt-history-entries');
+      if (historyDiv.classList.contains('expanded')) {
+        entriesDiv.style.display = 'block';
+      } else {
+        entriesDiv.style.display = 'none';
+      }
     }
 
     let currentEditTitleId = null;
