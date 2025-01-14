@@ -588,6 +588,37 @@
       font-size: 1.1rem;
       grid-column: 1 / -1;
     }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .defollow-button {
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background-color 0.2s;
+    }
+
+    .defollow-button:hover {
+      background: #d32f2f;
+    }
+
+    .defollow-button svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
   </style>
 </head>
 <body>
@@ -870,7 +901,17 @@
               <div class="prompt-history">
                 ${renderPromptHistory(img)}
               </div>
-              <div>by ${img.username}</div>
+              <div class="user-info">
+                by <span class="username-link" onclick="showUserGallery('${img.username}')">${img.username}</span>
+                ${currentTab === 'favorites' ? `
+                  <button class="defollow-button" onclick="event.stopPropagation(); unfollowUser('${img.username}')">
+                    <svg viewBox="0 0 24 24" width="12" height="12">
+                      <path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+                    </svg>
+                    Defollow
+                  </button>
+                ` : ''}
+              </div>
               <div>${new Date(img.created_at).toLocaleDateString()}</div>
             </div>
             <div class="stats">
@@ -1243,110 +1284,6 @@
         } catch (error) {
           console.error('Error adding to gallery:', error);
           alert('Failed to add image to gallery. Please try again.');
-        }
-      }
-
-      function generateImage() {
-        const prefixSelect = document.getElementById('prefixPrompt');
-        const promptInput = document.getElementById('promptInput');
-        const suffixSelect = document.getElementById('suffixPrompt');
-        const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
-        const imageContainer = document.getElementById('imageContainer');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const placeholderText = document.getElementById('placeholderText');
-        const saveButton = document.getElementById('saveButton');
-        const editorControls = document.getElementById('editorControls');
-        const addGalleryButton = document.getElementById('addGalleryButton');
-
-        if (!promptInput.value.trim()) {
-          alert('Please enter a prompt!');
-          return;
-        }
-
-        loadingSpinner.style.display = 'block';
-        placeholderText.style.display = 'none';
-        saveButton.style.display = 'none';
-        addGalleryButton.style.display = 'none';
-
-        const existingImages = imageContainer.querySelectorAll('img');
-        existingImages.forEach(img => img.remove());
-
-        const generatedImage = document.createElement('img');
-        generatedImage.id = `generatedImage_${Date.now()}`;
-        generatedImage.className = 'generated-image';
-        generatedImage.style.display = 'none';
-        generatedImage.crossOrigin = 'anonymous';
-        generatedImage.src = fullPrompt;
-        generatedImage.alt = fullPrompt;
-
-        const initialSrc = generatedImage.src;
-        
-        generatedImage.onload = async function() {
-          if (generatedImage.src !== initialSrc) {
-            loadingSpinner.style.display = 'none';
-            generatedImage.style.display = 'block';
-            placeholderText.style.display = 'none';
-            saveButton.style.display = 'block';
-            addGalleryButton.style.display = 'block';
-            currentImage = generatedImage;
-            
-            try {
-              await room.collection('gallery_images').create({
-                prompt: fullPrompt,
-                imageUrl: generatedImage.src, 
-                views: 0,
-                uses: 0,
-                promptHistory: [{
-                  prompt: fullPrompt,
-                  timestamp: new Date().toISOString(),
-                  username: room.party.client.username
-                }]
-              });
-              
-              setupImageEditor();
-              
-            } catch (error) {
-              console.error('Error processing generated image:', error);
-              alert('Failed to process generated image. Please try again.');
-            }
-          }
-        };
-
-        imageContainer.appendChild(generatedImage);
-      }
-
-      async function handleImageUpload(event) {
-        const file = event.target.files[0];
-        if (file) {
-          try {
-            const blob = await new Promise(resolve => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.readAsArrayBuffer(file);
-            });
-            
-            const imageUrl = await websim.upload(file);
-            
-            const uploadedImage = new Image();
-            uploadedImage.onload = function() {
-              currentImage = uploadedImage;
-              setupImageEditor();
-            };
-            uploadedImage.src = URL.createObjectURL(file);
-            
-            await room.collection('gallery_images').create({
-              imageUrl: imageUrl,
-              prompt: file.name,
-              views: 0,
-              uses: 0,
-              modified: false
-            });
-            
-          } catch (error) {
-            console.error('Error uploading image:', error);
-            alert('Failed to upload image. Please try again.');
-          }
         }
       }
 
@@ -1815,6 +1752,12 @@
         const input = document.getElementById('editTitleInput');
         input.value = '';
         dialog.style.display = 'none';
+      }
+
+      async function unfollowUser(username) {
+        favoriteUsers.delete(username);
+        localStorage.setItem('favoriteUsers', JSON.stringify([...favoriteUsers]));
+        renderGallery();
       }
 
       window.addEventListener('load', async () => {
