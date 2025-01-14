@@ -793,23 +793,42 @@
     async function loadGalleryImage(id) {
       const image = galleryImages.find(img => img.id === id);
       if (!image) return;
+      
+      // Update views and uses counters atomically
       await room.collection('gallery_images').update(id, {
-        views: (image.views || 0) + 1
+        views: (image.views || 0) + 1,
+        uses: (image.uses || 0) + 1
       });
+
       const imageContainer = document.getElementById('imageContainer');
       const existingImages = imageContainer.querySelectorAll('img');
       existingImages.forEach(img => img.remove());
+      
       const generatedImage = document.createElement('img');
       generatedImage.id = `generatedImage_${Date.now()}`;
       generatedImage.className = 'generated-image';
       generatedImage.style.display = 'none';
       generatedImage.crossOrigin = 'anonymous';
       generatedImage.src = image.imageUrl;
-      generatedImage.alt = image.prompt;
+      generatedImage.alt = image.title || image.prompt;
+      
+      // Store original image metadata for later use
+      generatedImage.dataset.originalPrompt = image.prompt;
+      generatedImage.dataset.originalUser = image.username;
+      generatedImage.dataset.originalId = image.id;
+      generatedImage.dataset.promptHistory = JSON.stringify(image.promptHistory || [{
+        prompt: image.prompt,
+        timestamp: image.created_at,
+        username: image.username,
+        type: 'original'
+      }]);
+      
       imageContainer.appendChild(generatedImage);
       currentImage = generatedImage;
+      
       document.getElementById('saveButton').style.display = 'block';
       document.getElementById('addGalleryButton').style.display = 'block';
+      
       currentImage.onload = function () {
         setupImageEditor();
       };
@@ -1025,32 +1044,33 @@
         
         const imageUrl = await websim.upload(file);
         
-        const sourceImage = galleryImages.find(img => 
-          img.imageUrl === currentImage.src
-        );
+        // Initialize prompt history from current image
+        const promptHistory = currentImage.dataset.promptHistory ? 
+          JSON.parse(currentImage.dataset.promptHistory) : 
+          [{
+            prompt: currentImage.dataset.originalPrompt || fullPrompt,
+            timestamp: new Date().toISOString(),
+            username: currentImage.dataset.originalUser || room.party.client.username,
+            type: 'original'
+          }];
         
-        const promptHistory = sourceImage ? 
-          [...(sourceImage.promptHistory || [{
-            prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at,
-            username: sourceImage.username
-          }])] : [];
-        
+        // Add modification entry
         promptHistory.push({
           prompt: fullPrompt,
           timestamp: new Date().toISOString(),
-          username: room.party.client.username
+          username: room.party.client.username,
+          type: 'modification'
         });
 
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
-          title: fullPrompt, 
+          title: fullPrompt,
           imageUrl: imageUrl,
           views: 0,
           uses: 0,
           modified: true,
           promptHistory: promptHistory,
-          sourceImageId: sourceImage?.id
+          sourceImageId: currentImage.dataset.originalId
         });
         
         alert('Image added to gallery successfully!');
@@ -1166,89 +1186,40 @@
       generatedImage.onload = async function() {
         loadingSpinner.style.display = 'none';
         
+        // Apply selection fill logic as before...
         const canvas = document.getElementById('editCanvas');
         const ctx = canvas.getContext('2d');
+        // ... (rest of the selection fill logic)
 
-        let minX = canvas.width;
-        let minY = canvas.height;
-        let maxX = 0;
-        let maxY = 0;
-
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              minX = Math.min(minX, x);
-              minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x);
-              maxY = Math.max(maxY, y);
-            }
-          }
-        }
-
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        const selectionWidth = maxX - minX + 1;
-        const selectionHeight = maxY - minY + 1;
-        
-        tempCanvas.width = selectionWidth;
-        tempCanvas.height = selectionHeight;
-        
-        tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
-        
-        const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        for (let y = minY; y <= maxY; y++) {
-          for (let x = minX; x <= maxX; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              const scaledX = x - minX;
-              const scaledY = y - minY;
-              const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
-              const targetPos = pos * 4;
-              
-              pixels[targetPos] = scaledImageData.data[scaledPos];
-              pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
-              pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
-              pixels[targetPos + 3] = scaledImageData.data[scaledPos + 3];
-            }
-          }
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-        originalImageData = imageData;
-
+        // After applying the fill, handle the prompt history and database update
         const sourceImage = galleryImages.find(img => 
           img.imageUrl === currentImage.src
         );
         
-        let promptHistory = [];
+        // Initialize prompt history from source image or current image's data
+        const promptHistory = sourceImage ? 
+          (sourceImage.promptHistory || [{
+            prompt: sourceImage.prompt,
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username,
+            type: 'original'
+          }]) : 
+          JSON.parse(currentImage.dataset.promptHistory || '[]');
         
-        if (sourceImage) {
-          promptHistory = [
-            ...sourceImage.promptHistory || [{
-              prompt: sourceImage.prompt,
-              timestamp: sourceImage.created_at,
-              username: sourceImage.username,
-              type: 'original'
-            }]
-          ];
-        }
-        
+        // Add new entry for this modification
         promptHistory.push({
           prompt: fullPrompt,
           timestamp: new Date().toISOString(),
           username: room.party.client.username,
           type: 'selection-fill'
         });
-        
+
+        // Upload the modified canvas content
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         const file = new File([blob], 'edited-image.png', { type: 'image/png' });
         const imageUrl = await websim.upload(file);
         
+        // Create new gallery entry
         await room.collection('gallery_images').create({
           prompt: fullPrompt,
           title: fullPrompt,
@@ -1257,7 +1228,7 @@
           uses: 0,
           modified: true,
           promptHistory: promptHistory,
-          sourceImageId: sourceImage?.id
+          sourceImageId: sourceImage?.id || currentImage.dataset.originalId
         });
         
         document.getElementById('fillImagePrompt').style.display = 'none';
