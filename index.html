@@ -554,49 +554,6 @@
       justify-content: flex-end;
       gap: 8px;
     }
-
-    .text-controls {
-      position: fixed;
-      background: rgba(0,0,0,0.8);
-      padding: 15px;
-      border-radius: 8px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-
-    .text-controls input[type="text"] {
-      width: 200px;
-      padding: 8px;
-      border: none;
-      border-radius: 4px;
-    }
-
-    .text-options {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .text-options select,
-    .text-options input {
-      padding: 4px;
-      border: none;
-      border-radius: 4px;
-    }
-
-    .text-options input[type="number"] {
-      width: 60px;
-    }
-
-    .text-preview {
-      position: absolute;
-      pointer-events: none;
-      white-space: nowrap;
-      transform-origin: left top;
-    }
   </style>
 </head>
 <body>
@@ -663,15 +620,15 @@
               </svg>
             </button>
 
-            <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool" data-tooltip="Clear Selection">
-              <svg viewBox="0 0 24 24">
-                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-              </svg>
-            </button>
-
             <button class="tool-button" onclick="setTool('text')" id="textTool" data-tooltip="Add Text">
               <svg viewBox="0 0 24 24">
                 <path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.33,18 15,18V19H9V18C9.67,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"/>
+              </svg>
+            </button>
+
+            <button class="tool-button" onclick="clearSelection()" id="clearSelectionTool" data-tooltip="Clear Selection">
+              <svg viewBox="0 0 24 24">
+                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
               </svg>
             </button>
 
@@ -694,23 +651,6 @@
       <div class="action-buttons">
         <button onclick="saveImage()" class="save-button" id="saveButton">Save Image</button>
         <button onclick="addToGallery()" class="add-gallery-button" id="addGalleryButton">Add to Gallery</button>
-      </div>
-    </div>
-
-    <div id="textControls" class="text-controls" style="display: none;">
-      <input type="text" id="textInput" placeholder="Enter text...">
-      <div class="text-options">
-        <select id="fontFamily">
-          <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Verdana">Verdana</option>
-        </select>
-        <input type="number" id="fontSize" value="24" min="8" max="72">
-        <input type="color" id="textColor" value="#000000">
-        <button onclick="commitText()">Apply</button>
-        <button onclick="cancelText()">Cancel</button>
       </div>
     </div>
 
@@ -763,8 +703,6 @@
     let isCtrlPressed = false;
     let selectionCanvas = null;
     let selectionCtx = null;
-    let currentTextPosition = null;
-    let textPreview = null;
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
@@ -913,27 +851,20 @@
       fillImagePrompt.style.display = 'none';
       if (!canvas.hasEventListener) {
         canvas.addEventListener('click', handleCanvasClick);
-        canvas.addEventListener('mousemove', handleCanvasMouseMove);
         canvas.hasEventListener = true;
       }
     }
 
     function handleCanvasClick(e) {
       const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) * (canvas.width / rect.width);
       const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-      const activeTool = document.querySelector('.tool-button.active');
-      if (activeTool && activeTool.id === 'textTool') {
-        handleTextTool(e.clientX, e.clientY, x, y);
-        return;
-      }
-
       if (!isShiftPressed && !isCtrlPressed) {
         currentSelection = null;
       }
-      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
       if (isShiftPressed || isCtrlPressed) {
         if (currentSelection) {
@@ -1008,7 +939,6 @@
     function setTool(tool) {
       const canvas = document.getElementById('editCanvas');
       const fillImagePrompt = document.getElementById('fillImagePrompt');
-      const textControls = document.getElementById('textControls');
       
       document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
       
@@ -1025,13 +955,10 @@
         setSelectionAlpha();
       } else if (tool === 'fillWithImage' && currentSelection) {
         fillImagePrompt.style.display = 'flex';
-      } else if (tool === 'text') {
-        canvas.style.cursor = 'text';
       } else {
         fillImagePrompt.style.display = 'none';
-        textControls.style.display = 'none';
-        canvas.style.cursor = tool === 'magicWand' ? 'crosshair' : 'default';
       }
+      canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
     }
 
     function fillSelection() {
@@ -1153,7 +1080,7 @@
       const promptInput = document.getElementById('promptInput');
       const suffixSelect = document.getElementById('suffixPrompt');
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
+      
       const imageContainer = document.getElementById('imageContainer');
       const loadingSpinner = document.getElementById('loadingSpinner');
       const placeholderText = document.getElementById('placeholderText');
@@ -1383,20 +1310,6 @@
       document.body.appendChild(generatedImage);
     }
 
-    function handleCanvasMouseMove(e) {
-      if (document.querySelector('.tool-button.active').id === 'textTool') {
-        if (textPreview) {
-          const rect = document.getElementById('editCanvas').getBoundingClientRect();
-          const x = (e.clientX - rect.left) * (document.getElementById('editCanvas').width / rect.width);
-          const y = (e.clientY - rect.top) * (document.getElementById('editCanvas').height / rect.height);
-          textPreview.style.left = `${e.clientX}px`;
-          textPreview.style.top = `${e.clientY}px`;
-          currentTextPosition = { x, y };
-          updateTextPreview();
-        }
-      }
-    }
-
     document.addEventListener('keydown', function (e) {
       if (e.shiftKey) isShiftPressed = true;
       if (e.ctrlKey) isCtrlPressed = true;
@@ -1571,93 +1484,6 @@
 
     document.getElementById('colorPreview').style.backgroundColor = document.getElementById('colorPicker').value;
     document.getElementById('colorValue').textContent = document.getElementById('colorPicker').value.toUpperCase();
-
-    function handleTextTool(clientX, clientY, canvasX, canvasY) {
-      const textControls = document.getElementById('textControls');
-      textControls.style.display = 'flex';
-      textControls.style.left = `${clientX}px`;
-      textControls.style.top = `${clientY}px`;
-      
-      currentTextPosition = { x: canvasX, y: canvasY };
-      
-      const textInput = document.getElementById('textInput');
-      textInput.focus();
-      
-      if (textPreview) {
-        textPreview.remove();
-      }
-      
-      textPreview = document.createElement('div');
-      textPreview.className = 'text-preview';
-      textPreview.style.left = `${clientX}px`;
-      textPreview.style.top = `${clientY}px`;
-      document.body.appendChild(textPreview);
-      
-      updateTextPreview();
-    }
-
-    function updateTextPreview() {
-      if (!textPreview || !currentTextPosition) return;
-      
-      const text = document.getElementById('textInput').value;
-      const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
-      const color = document.getElementById('textColor').value;
-      
-      textPreview.textContent = text || 'Enter text...';
-      textPreview.style.fontFamily = fontFamily;
-      textPreview.style.fontSize = `${fontSize}px`;
-      textPreview.style.color = color;
-    }
-
-    function commitText() {
-      if (!currentTextPosition) return;
-      
-      const canvas = document.getElementById('editCanvas');
-      const ctx = canvas.getContext('2d');
-      const text = document.getElementById('textInput').value;
-      
-      if (!text.trim()) {
-        cancelText();
-        return;
-      }
-      
-      ctx.save();
-      
-      const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
-      const color = document.getElementById('textColor').value;
-      
-      ctx.font = `${fontSize}px ${fontFamily}`;
-      ctx.fillStyle = color;
-      ctx.textBaseline = 'top';
-      
-      ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
-      
-      ctx.restore();
-      
-      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      cancelText();
-    }
-
-    function cancelText() {
-      const textControls = document.getElementById('textControls');
-      textControls.style.display = 'none';
-      document.getElementById('textInput').value = '';
-      
-      if (textPreview) {
-        textPreview.remove();
-        textPreview = null;
-      }
-      
-      currentTextPosition = null;
-    }
-
-    document.getElementById('textInput').addEventListener('input', updateTextPreview);
-    document.getElementById('fontFamily').addEventListener('change', updateTextPreview);
-    document.getElementById('fontSize').addEventListener('input', updateTextPreview);
-    document.getElementById('textColor').addEventListener('input', updateTextPreview);
   </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
