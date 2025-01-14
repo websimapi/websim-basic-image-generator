@@ -64,17 +64,31 @@ function renderGallery() {
 
   galleryEl.innerHTML = paginatedImages.map(img => `
     <div class="gallery-item">
-      <img 
-        src="${img.imageUrl}" 
-        alt="${img.prompt}" 
-        onclick="loadGalleryImage('${img.id}')" 
-        onload="this.style.opacity='1'" 
-        style="opacity: 0; transition: opacity 0.3s"
-      >
+      <div class="gallery-image" 
+           style="background-image: url('${img.imageUrl}')"
+           onclick="loadGalleryImage('${img.id}')">
+      </div>
       <div class="metadata">
-        <div>${img.prompt}</div>
+        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
+          ${img.title || 'Untitled'} 
+          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
+        </div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
+        <div class="prompt-history">
+          <details>
+            <summary>Prompt History</summary>
+            <ol>
+              ${(img.promptHistory || []).map((entry, i) => `
+                <li>
+                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
+                  ${entry.prompt}
+                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
+                </li>
+              `).join('')}
+            </ol>
+          </details>
+        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -82,61 +96,16 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
+          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
   
-  // Add retry logic to all gallery images
-  galleryEl.querySelectorAll('.gallery-item img').forEach(img => {
-    loadImageWithRetry(img);
-  });
-
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
-}
-
-function loadImageWithRetry(imgElement, retryCount = 3, delay = 3000) {
-  imgElement.onerror = function() {
-    if (retryCount > 0) {
-      console.log(`Retrying image load (${retryCount} attempts remaining): ${imgElement.src}`);
-      
-      // Remove the current image
-      const parent = imgElement.parentElement;
-      imgElement.remove();
-      
-      // Create new image element with same properties
-      const newImg = document.createElement('img');
-      newImg.src = imgElement.src;
-      newImg.alt = imgElement.alt;
-      newImg.className = imgElement.className;
-      newImg.onclick = imgElement.onclick;
-      newImg.onload = function () {
-        this.style.opacity = '1';
-      };
-      newImg.style.opacity = '0';
-      newImg.style.transition = 'opacity 0.3s';
-      
-      // Set up retry on the new image
-      setTimeout(() => {
-        parent.insertBefore(newImg, parent.firstChild);
-        loadImageWithRetry(newImg, retryCount - 1, delay);
-      }, delay);
-    } else {
-      console.error(`Failed to load image after retries: ${imgElement.src}`);
-      imgElement.src = 'data:image/svg+xml,' + encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-          <rect width="200" height="200" fill="#f0f0f0"/>
-          <text x="50%" y="50%" font-family="Arial" font-size="16" fill="#999" text-anchor="middle">
-            Image failed to load
-          </text>
-        </svg>
-      `);
-    }
-  };
 }
 
 async function showGalleryTab(tab) {
@@ -155,26 +124,32 @@ function changePage(delta) {
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
+  
   await room.collection('gallery_images').update(id, {
     views: (image.views || 0) + 1
   });
+  
   const imageContainer = document.getElementById('imageContainer');
-  const existingImages = imageContainer.querySelectorAll('img');
+  const existingImages = imageContainer.querySelectorAll('.gallery-generated-image');
   existingImages.forEach(img => img.remove());
-  const generatedImage = document.createElement('img');
+  
+  const generatedImage = document.createElement('div');
   generatedImage.id = `generatedImage_${Date.now()}`;
-  generatedImage.className = 'generated-image';
-  generatedImage.style.display = 'none';
-  generatedImage.crossOrigin = 'anonymous';
-  generatedImage.src = image.imageUrl;
-  generatedImage.alt = image.prompt;
+  generatedImage.className = 'gallery-generated-image';
+  generatedImage.style.backgroundImage = `url('${image.imageUrl}')`;
+  
   imageContainer.appendChild(generatedImage);
   currentImage = generatedImage;
+  
   document.getElementById('saveButton').style.display = 'block';
   document.getElementById('addGalleryButton').style.display = 'block';
-  currentImage.onload = function () {
+  
+  // Create a temporary image to detect when the background image has loaded
+  const tempImg = new Image();
+  tempImg.onload = function() {
     setupImageEditor();
   };
+  tempImg.src = image.imageUrl;
 }
 
 function setupImageEditor() {
@@ -187,13 +162,17 @@ function setupImageEditor() {
   loadingSpinner.style.display = 'none';
   placeholderText.style.display = 'none';
   if (currentImage) {
-    canvas.width = currentImage.naturalWidth;
-    canvas.height = currentImage.naturalHeight;
-    ctx.drawImage(currentImage, 0, 0);
-    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    currentImage.style.display = 'none';
-    canvas.style.display = 'block';
-    editorControls.style.display = 'flex';
+    canvas.width = currentImage.offsetWidth;
+    canvas.height = currentImage.offsetHeight;
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      currentImage.style.display = 'none';
+      canvas.style.display = 'block';
+      editorControls.style.display = 'flex';
+    };
+    img.src = currentImage.style.backgroundImage.replace('url(', '').replace(')', '');
   } else {
     canvas.style.display = 'none';
     editorControls.style.display = 'flex';
@@ -451,10 +430,12 @@ function generateImage() {
   generatedImage.src = fullPrompt;
   generatedImage.alt = fullPrompt;
 
-  // When image loads (generation complete)
+  // Track initial source to detect when generation is complete
+  const initialSrc = generatedImage.src;
+  
   generatedImage.onload = async function() {
     // Check if the src has changed (meaning generation is complete)
-    if (generatedImage.src !== fullPrompt) {
+    if (generatedImage.src !== initialSrc) {
       loadingSpinner.style.display = 'none';
       generatedImage.style.display = 'block';
       placeholderText.style.display = 'none';
@@ -647,14 +628,14 @@ document.addEventListener('keyup', function (e) {
   if (!e.ctrlKey) isCtrlPressed = false;
 });
 
-function editImage(id) {
+function editTitle(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
-  input.value = image.prompt;
+  input.value = image.title || '';
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
@@ -664,11 +645,11 @@ async function saveEdit() {
   const input = document.getElementById('editPromptInput');
   const newPrompt = input.value.trim();
   if (!newPrompt) {
-    alert('Please enter a prompt');
+    alert('Please enter a title');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    prompt: newPrompt
+    title: newPrompt
   });
   cancelEdit();
 }
