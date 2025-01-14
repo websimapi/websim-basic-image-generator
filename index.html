@@ -1322,7 +1322,6 @@
       document.body.appendChild(textPreview);
       
       // Position controls below preview
-      // Ensure controls stay within viewport
       const controlsHeight = 150; 
       const controlsWidth = 300;  
       
@@ -1356,20 +1355,21 @@
       
       const canvas = document.getElementById('editCanvas');
       const rect = canvas.getBoundingClientRect();
-      const scale = canvas.width / rect.width;  // Calculate scale factor
+      const scale = canvas.width / rect.width;
       
       const text = document.getElementById('textInput').value;
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
+      const fontSize = parseInt(document.getElementById('fontSize').value);
       const color = document.getElementById('textColor').value;
       
-      // Scale the font size for preview to match canvas rendering
-      const scaledFontSize = fontSize / scale;
-      
+      // Use the actual font size for preview
       textPreview.textContent = text || 'Enter text...';
       textPreview.style.fontFamily = fontFamily;
-      textPreview.style.fontSize = `${scaledFontSize}px`;
+      textPreview.style.fontSize = `${fontSize}px`;
       textPreview.style.color = color;
+      
+      // Scale the preview to match canvas size
+      textPreview.style.transform = `scale(${1/scale})`;
     }
 
     function commitText() {
@@ -1387,7 +1387,7 @@
       ctx.save();
       
       const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
+      const fontSize = parseInt(document.getElementById('fontSize').value);
       const color = document.getElementById('textColor').value;
       
       ctx.font = `${fontSize}px ${fontFamily}`;
@@ -1420,7 +1420,15 @@
           prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
           timestamp: new Date().toISOString(),
           type: 'text-modification',
-          username: room.party.client.username
+          username: room.party.client.username,
+          textDetails: {
+            text,
+            fontFamily,
+            fontSize,
+            color,
+            x: currentTextPosition.x,
+            y: currentTextPosition.y
+          }
         });
 
         canvas.toBlob(async (blob) => {
