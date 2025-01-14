@@ -1,12 +1,12 @@
 const room = new WebsimSocket();
 let galleryImages = [];
 let currentTab = 'recent';
+let currentPage = 1;
+let itemsPerPage = 12;
 let currentEditId = null;
 let currentSearch = '';
 let imageCounter = 0;
 let currentImage = null;
-let currentPage = 1;
-const itemsPerPage = 10;
 
 async function initGallery() {
   galleryImages = await room.collection('gallery_images').getList();
@@ -91,6 +91,16 @@ async function showGalleryTab(tab) {
   renderGallery();
 }
 
+function changePage(delta) {
+  const newPage = currentPage + delta;
+  const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
+  
+  if (newPage >= 1 && newPage <= totalPages) {
+    currentPage = newPage;
+    renderGallery();
+  }
+}
+
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
@@ -168,14 +178,4 @@ function filterGallery() {
   currentSearch = searchInput.value.trim();
   currentPage = 1; // Reset to first page when filtering
   renderGallery();
-}
-
-function changePage(delta) {
-  const newPage = currentPage + delta;
-  const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
-  
-  if (newPage >= 1 && newPage <= totalPages) {
-    currentPage = newPage;
-    renderGallery();
-  }
 }
