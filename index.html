@@ -714,7 +714,14 @@
           images.sort((a, b) => (b.views || 0) - (a.views || 0));
           break;
         case 'my':
-          images = images.filter(img => img.username === room.party.client.username);
+          images = images.filter(img => {
+            const isOriginalCreator = img.username === room.party.client.username;
+            const hasModifications = img.promptHistory?.some(entry => 
+              entry.username === room.party.client.username && 
+              entry.timestamp !== img.created_at
+            );
+            return isOriginalCreator || hasModifications;
+          });
           break;
         default:
           images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -744,6 +751,7 @@
               ${img.title || img.prompt}
               ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
             </div>
+            <div>${img.modified ? '(Remix)' : ''}</div>
             <div class="prompt-history">
               ${renderPromptHistory(img)}
             </div>
