@@ -711,7 +711,7 @@
           <button class="gallery-tab active" onclick="showGalleryTab('recent')">Recent</button>
           <button class="gallery-tab" onclick="showGalleryTab('popular')">Popular</button>
           <button class="gallery-tab" onclick="showGalleryTab('my')">My Images</button>
-          <button class="gallery-tab" onclick="showGalleryTab('favorites')">Favorites</button>
+          <button class="gallery-tab" onclick="showGalleryTab('favorites')">Following</button>
         </div>
         <div id="userFilterInfo" style="display: none; align-items: center; gap: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px;">
           <span>Showing images by: <strong id="userFilterName"></strong></span>
@@ -719,7 +719,7 @@
             <svg class="heart-icon" viewBox="0 0 24 24" width="18" height="18">
               <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
             </svg>
-            <span class="favorite-text">Favorite</span>
+            <span class="favorite-text">Follow</span>
           </button>
           <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
         </div>
@@ -836,8 +836,8 @@
             <div class="no-results">
               ${currentTab === 'favorites' ? 
                 favoriteUsers.size === 0 ? 
-                  'You haven\'t favorited any users yet' : 
-                  'No images from your favorite users' :
+                  'You haven\'t followed any users yet' : 
+                  'No images from users you follow' :
                 currentUserFilter ? 
                   'No images found by this user' : 
                   currentSearch ? 
@@ -907,11 +907,11 @@
         if (favoriteUsers.has(currentUserFilter)) {
           favoriteUsers.delete(currentUserFilter);
           button.classList.remove('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorite';
+          button.querySelector('.favorite-text').textContent = 'Follow';
         } else {
           favoriteUsers.add(currentUserFilter);
           button.classList.add('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorited';
+          button.querySelector('.favorite-text').textContent = 'Following';
         }
         
         localStorage.setItem('favoriteUsers', JSON.stringify([...favoriteUsers]));
@@ -929,10 +929,10 @@
         const button = document.getElementById('favoriteButton');
         if (favoriteUsers.has(username)) {
           button.classList.add('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorited';
+          button.querySelector('.favorite-text').textContent = 'Following';
         } else {
           button.classList.remove('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorite';
+          button.querySelector('.favorite-text').textContent = 'Follow';
         }
       }
 
@@ -1767,10 +1767,10 @@
         const button = document.getElementById('favoriteButton');
         if (favoriteUsers.has(username)) {
           button.classList.add('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorited';
+          button.querySelector('.favorite-text').textContent = 'Following';
         } else {
           button.classList.remove('favorited');
-          button.querySelector('.favorite-text').textContent = 'Favorite';
+          button.querySelector('.favorite-text').textContent = 'Follow';
         }
       }
 
