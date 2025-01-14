@@ -6,12 +6,6 @@ let isShiftPressed = false;
 let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
-let isPlacingText = false;
-let textPlacementX = 0;
-let textPlacementY = 0;
-let currentTextObj = null;
-let textObjects = [];
-let selectedTextObj = null;
 
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
@@ -43,8 +37,6 @@ function setupImageEditor() {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.hasEventListener = true;
   }
-
-  initTextInput();
 }
 
 function handleCanvasClick(e) {
@@ -158,145 +150,6 @@ function drawSelectionOverlay() {
   }
 }
 
-function initTextInput() {
-  const canvas = document.getElementById('editCanvas');
-  
-  canvas.addEventListener('click', function(e) {
-    if (!isPlacingText) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    textPlacementX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    textPlacementY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    createTextInput();
-    isPlacingText = false;
-    canvas.style.cursor = 'default';
-  });
-}
-
-function createTextInput() {
-  const container = document.createElement('div');
-  container.className = 'text-input-container';
-  container.style.position = 'absolute';
-  container.style.left = `${textPlacementX}px`;
-  container.style.top = `${textPlacementY}px`;
-  
-  const textInput = document.createElement('input');
-  textInput.type = 'text';
-  textInput.className = 'text-overlay-input';
-  textInput.placeholder = 'Type your text...';
-  
-  const controls = document.createElement('div');
-  controls.className = 'text-controls';
-  
-  const fontSelect = document.createElement('select');
-  fontSelect.innerHTML = `
-    <option value="Arial">Arial</option>
-    <option value="Times New Roman">Times New Roman</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Verdana">Verdana</option>
-  `;
-  
-  const fontSizeInput = document.createElement('input');
-  fontSizeInput.type = 'number';
-  fontSizeInput.value = '24';
-  fontSizeInput.min = '8';
-  fontSizeInput.max = '72';
-  
-  const colorInput = document.createElement('input');
-  colorInput.type = 'color';
-  colorInput.value = '#000000';
-  
-  const applyButton = document.createElement('button');
-  applyButton.textContent = 'Apply';
-  
-  controls.appendChild(fontSelect);
-  controls.appendChild(fontSizeInput);
-  controls.appendChild(colorInput);
-  controls.appendChild(applyButton);
-  
-  container.appendChild(textInput);
-  container.appendChild(controls);
-  
-  document.getElementById('imageContainer').appendChild(container);
-  
-  currentTextObj = {
-    x: textPlacementX,
-    y: textPlacementY,
-    text: '',
-    font: 'Arial',
-    size: 24,
-    color: '#000000'
-  };
-  
-  // Event listeners for live preview
-  textInput.addEventListener('input', function(e) {
-    currentTextObj.text = e.target.value;
-    redrawCanvas();
-  });
-  
-  fontSelect.addEventListener('change', function(e) {
-    currentTextObj.font = e.target.value;
-    redrawCanvas();
-  });
-  
-  fontSizeInput.addEventListener('input', function(e) {
-    currentTextObj.size = parseInt(e.target.value);
-    redrawCanvas();
-  });
-  
-  colorInput.addEventListener('input', function(e) {
-    currentTextObj.color = e.target.value;
-    redrawCanvas();
-  });
-  
-  applyButton.addEventListener('click', function() {
-    if (currentTextObj.text.trim()) {
-      textObjects.push({...currentTextObj});
-      container.remove();
-      redrawCanvas();
-      updateOriginalImageData();
-    }
-  });
-  
-  textInput.focus();
-}
-
-function redrawCanvas() {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  // Restore the original image
-  ctx.putImageData(originalImageData, 0, 0);
-  
-  // Draw all text objects
-  textObjects.forEach(drawTextObject);
-  
-  // Draw current text being edited
-  if (currentTextObj) {
-    drawTextObject(currentTextObj);
-  }
-
-  // Draw selection overlay if available
-  drawSelectionOverlay();
-}
-
-function drawTextObject(textObj) {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  ctx.font = `${textObj.size}px ${textObj.font}`;
-  ctx.fillStyle = textObj.color;
-  ctx.fillText(textObj.text, textObj.x, textObj.y);
-}
-
-function updateOriginalImageData() {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-}
-
 function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
@@ -310,13 +163,7 @@ function setTool(tool) {
     toolButton.classList.add('active');
   }
 
-  isPlacingText = tool === 'text';
-  canvas.style.cursor = isPlacingText ? 'text' : 'default';
-  
   switch (tool) {
-    case 'text':
-      fillImagePrompt.style.display = 'none';
-      break;
     case 'fillSelection':
       if (currentSelection) {
         fillImagePrompt.style.display = 'none';
@@ -365,7 +212,6 @@ function fillSelection() {
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
-  redrawCanvas();
 }
 
 function setSelectionAlpha() {
@@ -385,7 +231,6 @@ function setSelectionAlpha() {
   
   ctx.putImageData(imageData, 0, 0);
   originalImageData = imageData;
-  redrawCanvas();
 }
 
 function clearSelection() {
@@ -393,7 +238,6 @@ function clearSelection() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
-  redrawCanvas();
 }
 
 function resetImage() {
@@ -401,5 +245,4 @@ function resetImage() {
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
   currentSelection = null;
-  redrawCanvas();
 }
