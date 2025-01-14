@@ -50,19 +50,3 @@
 .title:hover .edit-icon {
   opacity: 1;
 }
-
-/* Update gallery item image styles */
-.gallery-item-image {
-  width: 100%;
-  height: 200px;
-  border-radius: 4px;
-  cursor: pointer;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  transition: transform 0.2s ease;
-}
-
-.gallery-item-image:hover {
-  transform: scale(1.05);
-}

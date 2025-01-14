@@ -64,35 +64,17 @@ function renderGallery() {
 
   galleryEl.innerHTML = paginatedImages.map(img => `
     <div class="gallery-item">
-      <div 
-        class="gallery-item-image" 
-        id="gallery-image-${img.id}"
-        onclick="loadGalleryImage('${img.id}')"
-        style="background-image: url('${img.imageUrl}')"
-        role="img"
-        aria-label="${img.prompt}"
-      ></div>
+      <img 
+        src="${img.imageUrl}" 
+        alt="${img.prompt}" 
+        onclick="loadGalleryImage('${img.id}')" 
+        onload="this.style.opacity='1'" 
+        style="opacity: 0; transition: opacity 0.3s"
+      >
       <div class="metadata">
-        <div class="title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
-          ${img.title || 'Untitled'} 
-          ${img.username === room.party.client.username ? '<span class="edit-icon">✎</span>' : ''}
-        </div>
+        <div>${img.prompt}</div>
         <div>by ${img.username}</div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
-        <div class="prompt-history">
-          <details>
-            <summary>Prompt History</summary>
-            <ol>
-              ${(img.promptHistory || []).map((entry, i) => `
-                <li>
-                  ${entry.type === 'original' ? '<strong>Original:</strong>' : '<strong>Selection Fill:</strong>'}
-                  ${entry.prompt}
-                  <span class="prompt-date">${new Date(entry.timestamp).toLocaleString()}</span>
-                </li>
-              `).join('')}
-            </ol>
-          </details>
-        </div>
       </div>
       <div class="stats">
         <span>${img.views || 0} views</span>
@@ -100,16 +82,61 @@ function renderGallery() {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editTitle('${img.id}')">Edit Title</button>
+          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
           <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
         </div>
       ` : ''}
     </div>
   `).join('');
   
+  // Add retry logic to all gallery images
+  galleryEl.querySelectorAll('.gallery-item img').forEach(img => {
+    loadImageWithRetry(img);
+  });
+
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
+}
+
+function loadImageWithRetry(imgElement, retryCount = 3, delay = 3000) {
+  imgElement.onerror = function() {
+    if (retryCount > 0) {
+      console.log(`Retrying image load (${retryCount} attempts remaining): ${imgElement.src}`);
+      
+      // Remove the current image
+      const parent = imgElement.parentElement;
+      imgElement.remove();
+      
+      // Create new image element with same properties
+      const newImg = document.createElement('img');
+      newImg.src = imgElement.src;
+      newImg.alt = imgElement.alt;
+      newImg.className = imgElement.className;
+      newImg.onclick = imgElement.onclick;
+      newImg.onload = function () {
+        this.style.opacity = '1';
+      };
+      newImg.style.opacity = '0';
+      newImg.style.transition = 'opacity 0.3s';
+      
+      // Set up retry on the new image
+      setTimeout(() => {
+        parent.insertBefore(newImg, parent.firstChild);
+        loadImageWithRetry(newImg, retryCount - 1, delay);
+      }, delay);
+    } else {
+      console.error(`Failed to load image after retries: ${imgElement.src}`);
+      imgElement.src = 'data:image/svg+xml,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+          <rect width="200" height="200" fill="#f0f0f0"/>
+          <text x="50%" y="50%" font-family="Arial" font-size="16" fill="#999" text-anchor="middle">
+            Image failed to load
+          </text>
+        </svg>
+      `);
+    }
+  };
 }
 
 async function showGalleryTab(tab) {
@@ -424,12 +451,10 @@ function generateImage() {
   generatedImage.src = fullPrompt;
   generatedImage.alt = fullPrompt;
 
-  // Track initial source to detect when generation is complete
-  const initialSrc = generatedImage.src;
-  
+  // When image loads (generation complete)
   generatedImage.onload = async function() {
     // Check if the src has changed (meaning generation is complete)
-    if (generatedImage.src !== initialSrc) {
+    if (generatedImage.src !== fullPrompt) {
       loadingSpinner.style.display = 'none';
       generatedImage.style.display = 'block';
       placeholderText.style.display = 'none';
@@ -622,14 +647,14 @@ document.addEventListener('keyup', function (e) {
   if (!e.ctrlKey) isCtrlPressed = false;
 });
 
-function editTitle(id) {
+function editImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
   currentEditId = id;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
-  input.value = image.title || 'Untitled';
+  input.value = image.prompt;
   dialog.style.display = 'block';
   overlay.style.display = 'block';
 }
@@ -639,11 +664,11 @@ async function saveEdit() {
   const input = document.getElementById('editPromptInput');
   const newPrompt = input.value.trim();
   if (!newPrompt) {
-    alert('Please enter a title');
+    alert('Please enter a prompt');
     return;
   }
   await room.collection('gallery_images').update(currentEditId, {
-    title: newPrompt
+    prompt: newPrompt
   });
   cancelEdit();
 }
