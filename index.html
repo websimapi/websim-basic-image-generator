@@ -3,6 +3,8 @@
   <base href="./">
   <title>AI Image Editor</title>
   <link rel="stylesheet" href="styles.css">
+  <script type="module" src="gallery.js"></script>
+  <script type="module" src="imageEditor.js"></script>
   <style>
     * {
       margin: 0;
@@ -643,11 +645,42 @@
     <div class="gallery-container">
       <div class="gallery-header">
         <div class="gallery-tabs">
-          <button class="gallery-tab active" onclick="showGalleryTab('recent')">Recent</button>
-          <button class="gallery-tab" onclick="showGalleryTab('popular')">Popular</button>
-          <button class="gallery-tab" onclick="showGalleryTab('my')">My Images</button>
+          <button class="gallery-tab active" data-tab="recent">Recent</button>
+          <button class="gallery-tab" data-tab="popular">Popular</button>
+          <button class="gallery-tab" data-tab="my">My Images</button>
         </div>
         <div class="search-container">
           <input type="text" id="gallerySearch" placeholder="Search images by title or username..." onkeyup="filterGallery()">
           <svg class="search-icon" viewBox="0 0 24 24">
-            <path d<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-1.19 4-2.98l.28.27v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initGallery, handleGalleryTab } from './gallery.js';
+    import { setupImageEditor } from './imageEditor.js';
+
+    window.addEventListener('load', async () => {
+      window.room = new WebsimSocket();
+      await initGallery();
+      setupImageEditor();
+
+      document.querySelectorAll('.gallery-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          handleGalleryTab(tab.dataset.tab);
+        });
+      });
+    });
+
+    window.generateImage = generateImage;
+    window.handleImageUpload = handleImageUpload;
+    window.saveImage = saveImage;
+    window.addToGallery = addToGallery;
+    window.filterGallery = filterGallery;
+  </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

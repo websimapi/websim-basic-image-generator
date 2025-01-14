@@ -7,7 +7,7 @@ let isCtrlPressed = false;
 let selectionCanvas = null;
 let selectionCtx = null;
 
-function setupImageEditor() {
+export function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const editorControls = document.getElementById('editorControls');
@@ -39,7 +39,7 @@ function setupImageEditor() {
   }
 }
 
-function handleCanvasClick(e) {
+export function handleCanvasClick(e) {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const rect = canvas.getBoundingClientRect();
@@ -150,7 +150,7 @@ function drawSelectionOverlay() {
   }
 }
 
-function setTool(tool) {
+export function setTool(tool) {
   const canvas = document.getElementById('editCanvas');
   const fillImagePrompt = document.getElementById('fillImagePrompt');
   
@@ -188,7 +188,7 @@ function setTool(tool) {
   canvas.className = tool === 'magicWand' ? 'magic-wand' : '';
 }
 
-function fillSelection() {
+export function fillSelection() {
   if (!currentSelection) return;
   
   const canvas = document.getElementById('editCanvas');
@@ -214,7 +214,7 @@ function fillSelection() {
   originalImageData = imageData;
 }
 
-function setSelectionAlpha() {
+export function setSelectionAlpha() {
   if (!currentSelection) return;
   
   const canvas = document.getElementById('editCanvas');
@@ -233,14 +233,14 @@ function setSelectionAlpha() {
   originalImageData = imageData;
 }
 
-function clearSelection() {
+export function clearSelection() {
   currentSelection = null;
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
 }
 
-function resetImage() {
+export function resetImage() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   ctx.putImageData(originalImageData, 0, 0);
