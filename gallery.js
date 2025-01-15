@@ -8,11 +8,44 @@ const state = {
   currentSearch: '',
   currentPage: 1,
   currentUserFilter: null,
-  itemsPerPage: 10
+  itemsPerPage: 10,
+  following: new Set()
 };
+
+// Initialize following from localStorage
+function initFollowing() {
+  const savedFollowing = localStorage.getItem('following');
+  if (savedFollowing) {
+    state.following = new Set(JSON.parse(savedFollowing));
+  }
+}
+
+// Save following to localStorage
+function saveFollowing() {
+  localStorage.setItem('following', JSON.stringify([...state.following]));
+}
+
+// Following management
+function followUser(username) {
+  if (username === room.party.client.username) return;
+  state.following.add(username);
+  saveFollowing();
+  renderGallery();
+}
+
+function unfollowUser(username) {
+  state.following.delete(username);
+  saveFollowing();
+  renderGallery();
+}
+
+function isFollowing(username) {
+  return state.following.has(username);
+}
 
 // Gallery initialization and subscription
 async function initGallery() {
+  initFollowing();
   state.galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
     state.galleryImages = images;
@@ -53,6 +86,10 @@ const galleryFilters = {
       );
       return isOriginalCreator || hasModifications;
     }),
+    following: (images) => images.filter(img => 
+      state.following.has(img.username) || 
+      img.promptHistory?.some(entry => state.following.has(entry.username))
+    ),
     recent: (images) => [...images].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }
 };
@@ -87,17 +124,34 @@ function renderGallery() {
   const pageImages = filteredImages.slice(startIndex, endIndex);
 
   updatePaginationControls(state.currentPage, totalPages);
+  
+  // Render Following List if on following tab
+  if (state.currentTab === 'following') {
+    renderFollowingList();
+  }
+  
   renderGalleryItems(pageImages, galleryEl);
 }
 
-function updateUserFilterUI(show) {
-  const filterInfo = document.getElementById('userFilterInfo');
-  if (show) {
-    filterInfo.style.display = 'flex';
-    document.getElementById('userFilterName').textContent = state.currentUserFilter;
-  } else {
-    filterInfo.style.display = 'none';
+function renderFollowingList() {
+  const followingListEl = document.getElementById('followingList');
+  if (!followingListEl) return;
+
+  if (state.following.size === 0) {
+    followingListEl.innerHTML = `
+      <div class="no-following">
+        You are not following anyone yet
+      </div>
+    `;
+    return;
   }
+
+  followingListEl.innerHTML = [...state.following].map(username => `
+    <div class="following-item">
+      <span class="username" onclick="showUserGallery('${username}')">${username}</span>
+      <button class="unfollow-button" onclick="unfollowUser('${username}')">Unfollow</button>
+    </div>
+  `).join('');
 }
 
 function renderGalleryItems(images, container) {
@@ -114,12 +168,30 @@ function renderGalleryItems(images, container) {
 }
 
 function createGalleryItemHTML(img) {
+  const followButton = img.username !== room.party.client.username ? `
+    <button 
+      class="follow-button ${isFollowing(img.username) ? 'following' : ''}" 
+      onclick="toggleFollow('${img.username}')"
+    >
+      ${isFollowing(img.username) ? 'Following' : 'Follow'}
+    </button>
+  ` : '';
+
   return `
     <div class="gallery-item">
-      <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
+      <div 
+        class="gallery-item-image" 
+        style="background-image: url('${img.imageUrl}')"
+        onclick="loadGalleryImage('${img.id}')"
+        role="img" 
+        aria-label="${img.prompt}"
+      ></div>
       <div class="metadata">
         <div>${img.prompt}</div>
-        <div>by ${img.username}</div>
+        <div>
+          by <span class="username-link" onclick="showUserGallery('${img.username}')">${img.username}</span>
+          ${followButton}
+        </div>
         <div>${new Date(img.created_at).toLocaleDateString()}</div>
       </div>
       <div class="stats">
@@ -128,12 +200,28 @@ function createGalleryItemHTML(img) {
       </div>
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
-          <button class="edit-button" onclick="editImage('${img.id}')">Edit</button>
-          <button class="delete-button" onclick="deleteImage('${img.id}')">Delete</button>
+          <button class="edit-button" onclick="editImage('${img.id}')">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+            </svg>
+          </button>
+          <button class="delete-button" onclick="deleteImage('${img.id}')">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+            </svg>
+          </button>
         </div>
       ` : ''}
     </div>
   `;
+}
+
+function toggleFollow(username) {
+  if (isFollowing(username)) {
+    unfollowUser(username);
+  } else {
+    followUser(username);
+  }
 }
 
 // Gallery item interaction handlers
@@ -297,4 +385,21 @@ let imageCounter = 0;
 
 function setupImageEditor() {
   // Setup image editor logic here
+}
+
+function updateUserFilterUI(show) {
+  const filterInfo = document.getElementById('userFilterInfo');
+  if (show) {
+    filterInfo.style.display = 'flex';
+    document.getElementById('userFilterName').textContent = state.currentUserFilter;
+  } else {
+    filterInfo.style.display = 'none';
+  }
+}
+
+function showUserGallery(username) {
+  state.currentUserFilter = username;
+  state.currentPage = 1; // Reset to first page when filtering
+  state.currentTab = 'recent'; // Reset to recent tab
+  renderGallery();
 }

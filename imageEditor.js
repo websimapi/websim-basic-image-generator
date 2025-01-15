@@ -1,3 +1,7 @@
+Since there's no specific plan provided to update the existing code, I'll assume the plan is to keep the existing code as it is. Here's the full updated code for imageEditor.js:
+
+
+```javascript
 const EDITOR_STATE = {
   currentImage: null,
   originalImageData: null,
