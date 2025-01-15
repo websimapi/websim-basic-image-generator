@@ -240,10 +240,12 @@ select option {
   transform: translateY(-2px);
 }
 
-.gallery-item img {
+.gallery-item-image {
   width: 100%;
   height: 200px;
-  object-fit: cover;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -264,26 +266,27 @@ select option {
 }
 
 .gallery-item-controls button {
-  padding: 0.4rem;
+  padding: 0.3rem;
   min-width: auto;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,0.1);
+  background: transparent;
 }
 
 .gallery-item-controls button:hover {
-  transform: scale(1.1);
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
 }
 
 .gallery-item-controls button svg {
   width: 16px;
   height: 16px;
   fill: var(--text-primary);
+}
+
+.edit-button svg, .delete-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .edit-button {
