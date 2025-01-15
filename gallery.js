@@ -1,66 +1,120 @@
 const room = new WebsimSocket();
-let galleryImages = [];
-let currentTab = 'recent';
-let currentEditId = null;
-let currentSearch = '';
-let imageCounter = 0;
-let currentImage = null;
-let currentPage = 1;
-const itemsPerPage = 10;
 
+// State management
+const state = {
+  galleryImages: [],
+  currentTab: 'recent',
+  currentEditId: null,
+  currentSearch: '',
+  currentPage: 1,
+  currentUserFilter: null,
+  itemsPerPage: 10
+};
+
+// Gallery initialization and subscription
 async function initGallery() {
-  galleryImages = await room.collection('gallery_images').getList();
+  state.galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
-    galleryImages = images;
+    state.galleryImages = images;
     renderGallery();
   });
   renderGallery();
 }
 
-function renderGallery() {
-  const galleryEl = document.getElementById('gallery');
-  let images = [...galleryImages];
-  
-  if (currentSearch) {
-    const searchLower = currentSearch.toLowerCase();
-    images = images.filter(img => 
+// Gallery filtering and sorting utilities
+const galleryFilters = {
+  search: (images, searchTerm) => {
+    if (!searchTerm) return images;
+    const searchLower = searchTerm.toLowerCase();
+    return images.filter(img => 
       img.prompt.toLowerCase().includes(searchLower) || 
       img.username.toLowerCase().includes(searchLower)
     );
+  },
+
+  userFilter: (images, username) => {
+    if (!username) return images;
+    return images.filter(img => {
+      const isCreator = img.username === username;
+      const hasModifications = img.promptHistory?.some(entry => 
+        entry.username === username
+      );
+      return isCreator || hasModifications;
+    });
+  },
+
+  tabFilter: {
+    popular: (images) => [...images].sort((a, b) => (b.views || 0) - (a.views || 0)),
+    my: (images, username) => images.filter(img => {
+      const isOriginalCreator = img.username === username;
+      const hasModifications = img.promptHistory?.some(entry => 
+        entry.username === username && 
+        entry.timestamp !== img.created_at
+      );
+      return isOriginalCreator || hasModifications;
+    }),
+    recent: (images) => [...images].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  }
+};
+
+// Gallery rendering
+function renderGallery() {
+  const galleryEl = document.getElementById('gallery');
+  let filteredImages = [...state.galleryImages];
+
+  // Apply filters in sequence
+  if (state.currentUserFilter) {
+    filteredImages = galleryFilters.userFilter(filteredImages, state.currentUserFilter);
+    updateUserFilterUI(true);
+  } else {
+    updateUserFilterUI(false);
   }
 
-  switch (currentTab) {
-    case 'popular':
-      images.sort((a, b) => (b.views || 0) - (a.views || 0));
-      break;
-    case 'my':
-      images = images.filter(img => img.username === room.party.client.username);
-      break;
-    default:
-      images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (state.currentSearch) {
+    filteredImages = galleryFilters.search(filteredImages, state.currentSearch);
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(images.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const pageImages = images.slice(startIndex, endIndex);
+  // Apply tab-specific filtering
+  filteredImages = galleryFilters.tabFilter[state.currentTab](
+    filteredImages, 
+    room.party.client.username
+  );
 
-  // Update pagination controls
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
-  document.getElementById('prevPage').disabled = currentPage === 1;
-  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+  // Pagination
+  const totalPages = Math.ceil(filteredImages.length / state.itemsPerPage);
+  const startIndex = (state.currentPage - 1) * state.itemsPerPage;
+  const endIndex = startIndex + state.itemsPerPage;
+  const pageImages = filteredImages.slice(startIndex, endIndex);
 
-  if (pageImages.length === 0) {
-    galleryEl.innerHTML = `
+  updatePaginationControls(state.currentPage, totalPages);
+  renderGalleryItems(pageImages, galleryEl);
+}
+
+function updateUserFilterUI(show) {
+  const filterInfo = document.getElementById('userFilterInfo');
+  if (show) {
+    filterInfo.style.display = 'flex';
+    document.getElementById('userFilterName').textContent = state.currentUserFilter;
+  } else {
+    filterInfo.style.display = 'none';
+  }
+}
+
+function renderGalleryItems(images, container) {
+  if (images.length === 0) {
+    container.innerHTML = `
       <div class="no-results">
-        ${currentSearch ? 'No images found matching your search' : 'No images available'}
+        ${getNoResultsMessage()}
       </div>
     `;
     return;
   }
 
-  galleryEl.innerHTML = pageImages.map(img => `
+  container.innerHTML = images.map(img => createGalleryItemHTML(img)).join('');
+}
+
+function createGalleryItemHTML(img) {
+  return `
     <div class="gallery-item">
       <img src="${img.imageUrl}" alt="${img.prompt}" onclick="loadGalleryImage('${img.id}')">
       <div class="metadata">
@@ -79,53 +133,72 @@ function renderGallery() {
         </div>
       ` : ''}
     </div>
-  `).join('');
+  `;
+}
+
+// Gallery item interaction handlers
+async function loadGalleryImage(id) {
+  const image = state.galleryImages.find(img => img.id === id);
+  if (!image) return;
+  
+  await updateImageStats(id, image);
+  await loadImageIntoEditor(image);
+}
+
+async function updateImageStats(id, image) {
+  return room.collection('gallery_images').update(id, {
+    views: (image.views || 0) + 1,
+    uses: (image.uses || 0) + 1
+  });
+}
+
+async function handleImageModification(sourceImage, newImageUrl, modificationDetails) {
+  const promptHistory = buildPromptHistory(sourceImage, modificationDetails);
+  
+  await createModifiedImageRecord(sourceImage, newImageUrl, promptHistory);
+  await updateSourceImageUses(sourceImage);
+}
+
+// Utility functions
+function buildPromptHistory(sourceImage, newEntry) {
+  const baseHistory = sourceImage.promptHistory || [{
+    prompt: sourceImage.prompt,
+    timestamp: sourceImage.created_at,
+    username: sourceImage.username
+  }];
+  
+  return [...baseHistory, {
+    ...newEntry,
+    timestamp: new Date().toISOString(),
+    username: room.party.client.username
+  }];
+}
+
+function getNoResultsMessage() {
+  if (state.currentUserFilter) return 'No images found by this user';
+  if (state.currentSearch) return 'No images found matching your search';
+  return 'No images available';
+}
+
+function updatePaginationControls(currentPage, totalPages) {
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById('prevPage').disabled = currentPage === 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
 }
 
 async function showGalleryTab(tab) {
-  currentTab = tab;
-  currentPage = 1; // Reset to first page when changing tabs
+  state.currentTab = tab;
+  state.currentPage = 1; // Reset to first page when changing tabs
   document.querySelectorAll('.gallery-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
   });
   renderGallery();
 }
 
-async function loadGalleryImage(id) {
-  const image = galleryImages.find(img => img.id === id);
+async function editImage(id) {
+  const image = state.galleryImages.find(img => img.id === id);
   if (!image) return;
-  
-  await room.collection('gallery_images').update(id, {
-    views: (image.views || 0) + 1
-  });
-
-  const imageContainer = document.getElementById('imageContainer');
-  const existingImages = imageContainer.querySelectorAll('img');
-  existingImages.forEach(img => img.remove());
-  
-  const generatedImage = document.createElement('img');
-  generatedImage.id = `generatedImage_${imageCounter++}`;
-  generatedImage.className = 'generated-image';
-  generatedImage.style.display = 'none';
-  generatedImage.crossOrigin = 'anonymous';
-  generatedImage.src = image.imageUrl;
-  generatedImage.alt = image.prompt;
-  
-  imageContainer.appendChild(generatedImage);
-  currentImage = generatedImage;
-  
-  document.getElementById('saveButton').style.display = 'block';
-  document.getElementById('addGalleryButton').style.display = 'block';
-  
-  currentImage.onload = function () {
-    setupImageEditor();
-  };
-}
-
-function editImage(id) {
-  const image = galleryImages.find(img => img.id === id);
-  if (!image) return;
-  currentEditId = id;
+  state.currentEditId = id;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
@@ -135,21 +208,21 @@ function editImage(id) {
 }
 
 async function saveEdit() {
-  if (!currentEditId) return;
+  if (!state.currentEditId) return;
   const input = document.getElementById('editPromptInput');
   const newPrompt = input.value.trim();
   if (!newPrompt) {
     alert('Please enter a prompt');
     return;
   }
-  await room.collection('gallery_images').update(currentEditId, {
+  await room.collection('gallery_images').update(state.currentEditId, {
     prompt: newPrompt
   });
   cancelEdit();
 }
 
 function cancelEdit() {
-  currentEditId = null;
+  state.currentEditId = null;
   const dialog = document.getElementById('editPromptDialog');
   const overlay = document.getElementById('overlay');
   const input = document.getElementById('editPromptInput');
@@ -165,17 +238,63 @@ async function deleteImage(id) {
 
 function filterGallery() {
   const searchInput = document.getElementById('gallerySearch');
-  currentSearch = searchInput.value.trim();
-  currentPage = 1; // Reset to first page when filtering
+  state.currentSearch = searchInput.value.trim();
+  state.currentPage = 1; // Reset to first page when filtering
   renderGallery();
 }
 
 function changePage(delta) {
-  const newPage = currentPage + delta;
-  const totalPages = Math.ceil(galleryImages.length / itemsPerPage);
+  const newPage = state.currentPage + delta;
+  const totalPages = Math.ceil(state.galleryImages.length / state.itemsPerPage);
   
   if (newPage >= 1 && newPage <= totalPages) {
-    currentPage = newPage;
+    state.currentPage = newPage;
     renderGallery();
   }
+}
+
+async function createModifiedImageRecord(sourceImage, newImageUrl, promptHistory) {
+  return room.collection('gallery_images').create({
+    prompt: sourceImage.prompt,
+    imageUrl: newImageUrl,
+    created_at: new Date().toISOString(),
+    views: 0,
+    uses: 0,
+    promptHistory
+  });
+}
+
+async function updateSourceImageUses(sourceImage) {
+  return room.collection('gallery_images').update(sourceImage.id, {
+    uses: (sourceImage.uses || 0) + 1
+  });
+}
+
+async function loadImageIntoEditor(image) {
+  const imageContainer = document.getElementById('imageContainer');
+  const existingImages = imageContainer.querySelectorAll('img');
+  existingImages.forEach(img => img.remove());
+  
+  const generatedImage = document.createElement('img');
+  generatedImage.id = `generatedImage_${imageCounter++}`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
+  generatedImage.src = image.imageUrl;
+  generatedImage.alt = image.prompt;
+  
+  imageContainer.appendChild(generatedImage);
+  
+  document.getElementById('saveButton').style.display = 'block';
+  document.getElementById('addGalleryButton').style.display = 'block';
+  
+  generatedImage.onload = function () {
+    setupImageEditor();
+  };
+}
+
+let imageCounter = 0;
+
+function setupImageEditor() {
+  // Setup image editor logic here
 }

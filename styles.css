@@ -1,3 +1,17 @@
+/* Base styles */
+:root {
+  --primary-color: #4CAF50;
+  --secondary-color: #2196F3;
+  --accent-color: #9c27b0;
+  --danger-color: #f44336;
+  --background-primary: #1a1a2e;
+  --background-secondary: #16213e;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255,255,255,0.7);
+  --spacing-unit: 1rem;
+}
+
+/* Layout & Typography */
 * {
   margin: 0;
   padding: 0;
@@ -9,45 +23,46 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  color: white;
-  font-family: Arial, sans-serif;
-  padding: 2rem;
+  background: linear-gradient(135deg, var(--background-primary), var(--background-secondary));
+  color: var(--text-primary);
+  font-family: 'Inter', Arial, sans-serif;
+  padding: var(--spacing-unit) * 2;
 }
 
 .container {
-  max-width: 800px;
+  max-width: 1200px;
   width: 95%;
   text-align: center;
-  padding: 10px;
+  padding: var(--spacing-unit);
+  margin: 0 auto;
 }
 
 h1 {
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-unit) * 2;
   font-size: 2.5rem;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
 /* Input Controls */
 .input-group {
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-unit) * 2;
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-unit);
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
   background: rgba(255,255,255,0.05);
-  padding: 1rem;
+  padding: var(--spacing-unit);
   border-radius: 8px;
 }
 
 input, select {
-  padding: 1rem;
+  padding: var(--spacing-unit);
   font-size: 1rem;
   border: none;
   border-radius: 5px;
   background: rgba(255,255,255,0.1);
-  color: white;
+  color: var(--text-primary);
 }
 
 input {
@@ -64,32 +79,31 @@ select {
 }
 
 select option {
-  background: #16213e;
-  color: white;
+  background: var(--background-secondary);
+  color: var(--text-primary);
 }
 
-button {
+/* Controls & Buttons */
+.button {
   padding: 0.8rem 1.5rem;
   font-size: 0.9rem;
-  background: #4CAF50;
+  background: var(--primary-color);
   border: none;
   border-radius: 5px;
-  color: white;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  min-width: 120px;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
-button:hover {
+.button:hover {
   transform: scale(1.05);
   background: #45a049;
 }
 
 /* Image Container */
 .image-container {
-  margin-top: 2rem;
-  padding: 1rem;
+  margin-top: var(--spacing-unit) * 2;
+  padding: var(--spacing-unit);
   background: rgba(255,255,255,0.1);
   border-radius: 10px;
   min-height: 300px;
@@ -102,7 +116,7 @@ button:hover {
 
 .loading {
   border: 4px solid rgba(255,255,255,0.1);
-  border-top: 4px solid #4CAF50;
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -127,13 +141,13 @@ button:hover {
 
 /* Editor Controls */
 .editor-controls {
-  margin-top: 1rem;
+  margin-top: var(--spacing-unit);
   display: flex;
-  gap: 1rem;
+  gap: var(--spacing-unit);
   flex-wrap: wrap;
   justify-content: center;
   background: rgba(255,255,255,0.05);
-  padding: 1rem;
+  padding: var(--spacing-unit);
   border-radius: 8px;
 }
 
@@ -146,10 +160,10 @@ button:hover {
 
 .tool-button {
   padding: 0.6rem;
-  background: #2196F3;
+  background: var(--secondary-color);
   border: none;
   border-radius: 5px;
-  color: white;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
@@ -183,7 +197,7 @@ button:hover {
   padding: 5px 10px;
   background: rgba(255,255,255,0.1);
   border-radius: 5px;
-  margin-left: 10px;
+  margin-left: var(--spacing-unit);
   flex-wrap: wrap;
 }
 
@@ -196,30 +210,30 @@ button:hover {
 }
 
 .color-value {
-  color: white;
+  color: var(--text-primary);
   font-family: monospace;
 }
 
-/* Gallery */
+/* Gallery Grid */
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
+  gap: var(--spacing-unit);
   width: 100%;
-  padding: 1rem;
+  padding: var(--spacing-unit);
   background: rgba(255,255,255,0.05);
   border-radius: 8px;
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-unit) * 2;
 }
 
 .gallery-item {
   background: rgba(255,255,255,0.1);
   border-radius: 8px;
-  padding: 1rem;
+  padding: var(--spacing-unit);
+  transition: transform 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  transition: transform 0.2s;
 }
 
 .gallery-item:hover {
@@ -239,8 +253,8 @@ button:hover {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
 }
 
 .gallery-item-controls {
@@ -269,11 +283,11 @@ button:hover {
 .gallery-item-controls button svg {
   width: 16px;
   height: 16px;
-  fill: white;
+  fill: var(--text-primary);
 }
 
 .edit-button {
-  background: #2196F3 !important;
+  background: var(--secondary-color) !important;
 }
 
 .edit-button:hover {
@@ -281,7 +295,7 @@ button:hover {
 }
 
 .delete-button {
-  background: #f44336 !important;
+  background: var(--danger-color) !important;
 }
 
 .delete-button:hover {
@@ -291,22 +305,22 @@ button:hover {
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 1rem;
+  gap: var(--spacing-unit);
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: var(--spacing-unit);
 }
 
 .save-button {
-  background: #2196F3;
+  background: var(--secondary-color);
 }
 
 .add-gallery-button {
-  background: #9c27b0;
+  background: var(--accent-color);
 }
 
 /* Prompt History */
 .prompt-history {
-  margin: 8px 0;
+  margin: var(--spacing-unit) 0;
   font-size: 0.9rem;
   color: rgba(255,255,255,0.7);
   background: rgba(0,0,0,0.2);
@@ -315,7 +329,7 @@ button:hover {
 }
 
 .prompt-history-header {
-  padding: 8px 12px;
+  padding: var(--spacing-unit) 1.2rem;
   background: rgba(255,255,255,0.1);
   cursor: pointer;
   display: flex;
@@ -339,7 +353,7 @@ button:hover {
 }
 
 .prompt-history-entry {
-  padding: 8px 12px;
+  padding: var(--spacing-unit) 1.2rem;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -363,9 +377,9 @@ button:hover {
 }
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   body {
-    padding: 1rem;
+    padding: var(--spacing-unit);
   }
 
   h1 {
@@ -382,5 +396,19 @@ button:hover {
 
   .tool-group {
     gap: 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: var(--spacing-unit);
+  }
+
+  .gallery {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  .controls-group {
+    flex-direction: column;
   }
 }

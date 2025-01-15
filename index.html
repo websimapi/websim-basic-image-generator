@@ -545,37 +545,6 @@
     .clear-filter-button:hover {
       background: #d32f2f;
     }
-
-    .follow-button {
-      background: #9c27b0;
-      padding: 0.5rem 1rem;
-      font-size: 0.9rem;
-      border: none;
-      border-radius: 4px;
-      color: white;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .follow-button:hover {
-      background: #7b1fa2;
-    }
-
-    .follow-button.following {
-      background: #f44336;
-    }
-
-    .follow-button.following:hover {
-      background: #d32f2f;
-    }
-
-    .no-follows {
-      text-align: center;
-      padding: 2rem;
-      color: rgba(255,255,255,0.6);
-      font-size: 1.1rem;
-      grid-column: 1 / -1;
-    }
   </style>
 </head>
 <body>
@@ -698,16 +667,11 @@
         <div class="gallery-tabs">
           <button class="gallery-tab active" onclick="showGalleryTab('recent')">Recent</button>
           <button class="gallery-tab" onclick="showGalleryTab('popular')">Popular</button>
-          <button class="gallery-tab" onclick="showGalleryTab('following')">Following</button>
           <button class="gallery-tab" onclick="showGalleryTab('my')">My Images</button>
         </div>
         <div id="userFilterInfo" style="display: none; align-items: center; gap: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px;">
           <span>Showing images by: <strong id="userFilterName"></strong></span>
           <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
-        </div>
-        <div id="followUserInfo" style="display: none; align-items: center; gap: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px;">
-          <span>Viewing: <strong id="followedUsername"></strong></span>
-          <button id="followButton" onclick="toggleFollow()" class="follow-button">Follow</button>
         </div>
         <div class="search-container">
           <input type="text" id="gallerySearch" placeholder="Search images by title or username..." onkeyup="filterGallery()">
@@ -754,28 +718,13 @@
     let currentTextPosition = null;
     let textPreview = null;
     let currentUserFilter = null;
-    let followedUsers = new Set();
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
-      const following = await room.collection('user_follows').filter({
-        follower: room.party.client.username
-      }).getList();
-      
-      followedUsers = new Set(following.map(f => f.following));
-      
       room.collection('gallery_images').subscribe(images => {
         galleryImages = images;
         renderGallery();
       });
-
-      room.collection('user_follows').filter({
-        follower: room.party.client.username
-      }).subscribe(following => {
-        followedUsers = new Set(following.map(f => f.following));
-        renderGallery();
-      });
-      
       renderGallery();
     }
 
@@ -783,38 +732,14 @@
       const galleryEl = document.getElementById('gallery');
       let images = [...galleryImages];
       
-      const followUserInfo = document.getElementById('followUserInfo');
-      const followButton = document.getElementById('followButton');
-      const followedUsername = document.getElementById('followedUsername');
-      
       if (currentUserFilter) {
-        followUserInfo.style.display = 'flex';
-        followedUsername.textContent = currentUserFilter;
-        followButton.textContent = followedUsers.has(currentUserFilter) ? 'Unfollow' : 'Follow';
-        followButton.classList.toggle('following', followedUsers.has(currentUserFilter));
-        
-        if (currentUserFilter === room.party.client.username) {
-          followButton.style.display = 'none';
-        } else {
-          followButton.style.display = 'block';
-        }
-      } else {
-        followUserInfo.style.display = 'none';
-      }
-
-      if (currentTab === 'following') {
-        images = images.filter(img => followedUsers.has(img.username));
-        
-        if (images.length === 0) {
-          galleryEl.innerHTML = `
-            <div class="no-follows">
-              You're not following anyone yet. Browse the gallery and follow users to see their images here!
-            </div>
-          `;
-          return;
-        }
-      } else if (currentUserFilter) {
-        images = images.filter(img => img.username === currentUserFilter);
+        images = images.filter(img => {
+          const isCreator = img.username === currentUserFilter;
+          const hasModifications = img.promptHistory?.some(entry => 
+            entry.username === currentUserFilter
+          );
+          return isCreator || hasModifications;
+        });
       } else if (currentSearch) {
         const searchLower = currentSearch.toLowerCase();
         images = images.filter(img => 
@@ -913,8 +838,6 @@
 
     async function showGalleryTab(tab) {
       currentTab = tab;
-      currentPage = 1;
-      currentUserFilter = null;
       document.querySelectorAll('.gallery-tab').forEach(el => {
         el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
       });
@@ -1247,13 +1170,19 @@
       generatedImage.className = 'generated-image';
       generatedImage.style.display = 'none';
       generatedImage.crossOrigin = 'anonymous';
+      
+      // Set a flag to track if this is a fresh generation
+      generatedImage.dataset.freshGeneration = 'true';
+      
       generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
-      const initialSrc = generatedImage.src;
-      
       generatedImage.onload = async function() {
-        if (generatedImage.src !== initialSrc) {
+        // Check if this is a fresh generation and hasn't been processed yet
+        if (generatedImage.dataset.freshGeneration === 'true') {
+          // Immediately mark as processed to prevent duplicate processing
+          generatedImage.dataset.freshGeneration = 'false';
+          
           loadingSpinner.style.display = 'none';
           generatedImage.style.display = 'block';
           placeholderText.style.display = 'none';
@@ -1262,7 +1191,8 @@
           currentImage = generatedImage;
           
           try {
-            await room.collection('gallery_images').create({
+            // Create new gallery entry for the generated image
+            const galleryEntry = await room.collection('gallery_images').create({
               prompt: fullPrompt,
               imageUrl: generatedImage.src, 
               views: 0,
@@ -1273,6 +1203,9 @@
                 username: room.party.client.username
               }]
             });
+            
+            // Store the gallery entry ID on the image element
+            generatedImage.dataset.galleryId = galleryEntry.id;
             
             setupImageEditor();
             
@@ -1286,42 +1219,8 @@
       imageContainer.appendChild(generatedImage);
     }
 
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        try {
-          const blob = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsArrayBuffer(file);
-          });
-          
-          const imageUrl = await websim.upload(file);
-          
-          const uploadedImage = new Image();
-          uploadedImage.onload = function() {
-            currentImage = uploadedImage;
-            setupImageEditor();
-          };
-          uploadedImage.src = URL.createObjectURL(file);
-          
-          await room.collection('gallery_images').create({
-            imageUrl: imageUrl,
-            prompt: file.name,
-            views: 0,
-            uses: 0,
-            modified: false
-          });
-          
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          alert('Failed to upload image. Please try again.');
-        }
-      }
-    }
-
     async function commitText() {
-      if (!currentTextPosition) return;
+      if (!currentTextPosition || !currentImage) return;
       
       const canvas = document.getElementById('editCanvas');
       const ctx = canvas.getContext('2d');
@@ -1351,8 +1250,14 @@
       
       originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-      // Add text modification to prompt history if a gallery image is being edited
-      const sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+      // If this is a newly generated image, get its ID from the dataset
+      let sourceImage;
+      if (currentImage.dataset.galleryId) {
+        sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
+      } else {
+        // Otherwise find by URL for existing gallery images
+        sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+      }
       
       if (sourceImage) {
         // Get the base prompt history - either from the current image or create new from source
@@ -1375,36 +1280,43 @@
           username: room.party.client.username
         });
         
-        // Create new modified image entry
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-        const imageUrl = await websim.upload(file);
-        
-        await room.collection('gallery_images').create({
-          prompt: sourceImage.prompt,
-          title: sourceImage.title || sourceImage.prompt,
-          imageUrl: imageUrl,
-          views: 0,
-          uses: 0,
-          modified: true,
-          promptHistory: promptHistory,
-          sourceImageId: sourceImage.id
-        });
+        try {
+          // Create new modified image entry
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+          const imageUrl = await websim.upload(file);
+          
+          const newEntry = await room.collection('gallery_images').create({
+            prompt: sourceImage.prompt,
+            title: sourceImage.title || sourceImage.prompt,
+            imageUrl: imageUrl,
+            views: 0,
+            uses: 0,
+            modified: true,
+            promptHistory: promptHistory,
+            sourceImageId: sourceImage.id
+          });
 
-        // Update usage count of source image
-        await room.collection('gallery_images').update(sourceImage.id, {
-          uses: (sourceImage.uses || 0) + 1
-        });
+          // Update usage count of source image
+          await room.collection('gallery_images').update(sourceImage.id, {
+            uses: (sourceImage.uses || 0) + 1
+          });
 
-        // Update the current image reference
-        currentImage.src = imageUrl;
+          // Update the current image reference and its gallery ID
+          currentImage.src = imageUrl;
+          currentImage.dataset.galleryId = newEntry.id;
+          
+        } catch (error) {
+          console.error('Error saving text edit:', error);
+          alert('Failed to save text edit. Please try again.');
+        }
       }
       
       cancelText();
     }
 
     async function generateSelectionFill() {
-      if (!currentSelection) return;
+      if (!currentSelection || !currentImage) return;
       
       const prompt = document.getElementById('selectionPromptInput').value.trim();
       if (!prompt) {
@@ -1420,15 +1332,17 @@
       loadingSpinner.style.display = 'block';
 
       const generatedImage = document.createElement('img');
-      const tempId = `fillImage_${Date.now()}`;
-      generatedImage.id = tempId;
       generatedImage.crossOrigin = 'anonymous';
       generatedImage.style.display = 'none';
+      generatedImage.dataset.freshFill = 'true';
       
       generatedImage.src = fullPrompt;
       generatedImage.alt = fullPrompt;
 
       generatedImage.onload = async function() {
+        if (generatedImage.dataset.freshFill !== 'true') return;
+        generatedImage.dataset.freshFill = 'false';
+        
         loadingSpinner.style.display = 'none';
         
         const canvas = document.getElementById('editCanvas');
@@ -1486,51 +1400,63 @@
         ctx.putImageData(imageData, 0, 0);
         originalImageData = imageData;
 
-        const sourceImage = galleryImages.find(img => 
-          img.imageUrl === currentImage.src
-        );
+        // If this is a newly generated image, get its ID from the dataset
+        let sourceImage;
+        if (currentImage.dataset.galleryId) {
+          sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
+        } else {
+          // Otherwise find by URL for existing gallery images
+          sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+        }
         
         if (sourceImage) {
-          await room.collection('gallery_images').update(sourceImage.id, {
-            uses: (sourceImage.uses || 0) + 1
-          });
-          
-          // Get the base prompt history - either from the current image or create new from source
-          const basePromptHistory = galleryImages.find(img => 
-            img.imageUrl === currentImage.src
-          )?.promptHistory || [{
-            prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at,
-            username: sourceImage.username
-          }];
-          
-          // Create a fresh copy to avoid reference issues
-          const promptHistory = [...basePromptHistory];
-          
-          promptHistory.push({
-            prompt: fullPrompt,
-            timestamp: new Date().toISOString(),
-            type: 'selection-fill',
-            username: room.party.client.username
-          });
-          
-          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-          const imageUrl = await websim.upload(file);
-          
-          await room.collection('gallery_images').create({
-            prompt: fullPrompt,
-            title: fullPrompt,
-            imageUrl: imageUrl,
-            views: 0,
-            uses: 0,
-            modified: true,
-            promptHistory: promptHistory,
-            sourceImageId: sourceImage.id
-          });
+          try {
+            await room.collection('gallery_images').update(sourceImage.id, {
+              uses: (sourceImage.uses || 0) + 1
+            });
+            
+            // Get the base prompt history - either from the current image or create new from source
+            const basePromptHistory = galleryImages.find(img => 
+              img.imageUrl === currentImage.src
+            )?.promptHistory || [{
+              prompt: sourceImage.prompt,
+              timestamp: sourceImage.created_at,
+              username: sourceImage.username
+            }];
+            
+            // Create a fresh copy to avoid reference issues
+            const promptHistory = [...basePromptHistory];
+            
+            promptHistory.push({
+              prompt: fullPrompt,
+              timestamp: new Date().toISOString(),
+              type: 'selection-fill',
+              username: room.party.client.username
+            });
+            
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+            const imageUrl = await websim.upload(file);
+            
+            const newEntry = await room.collection('gallery_images').create({
+              prompt: fullPrompt,
+              title: fullPrompt,
+              imageUrl: imageUrl,
+              views: 0,
+              uses: 0,
+              modified: true,
+              promptHistory: promptHistory,
+              sourceImageId: sourceImage.id
+            });
 
-          // Update the current image reference
-          currentImage.src = imageUrl;
+            // Update the current image reference and its gallery ID
+            currentImage.src = imageUrl;
+            currentImage.dataset.galleryId = newEntry.id;
+            
+          } catch (error) {
+            console.error('Error saving selection fill:', error);
+            alert('Failed to save selection fill. Please try again.');
+          }
         }
         
         document.getElementById('fillImagePrompt').style.display = 'none';
@@ -1793,31 +1719,6 @@
       const input = document.getElementById('editTitleInput');
       input.value = '';
       dialog.style.display = 'none';
-    }
-
-    async function toggleFollow() {
-      if (!currentUserFilter || currentUserFilter === room.party.client.username) return;
-      
-      const follows = await room.collection('user_follows').filter({
-        follower: room.party.client.username,
-        following: currentUserFilter
-      }).getList();
-      
-      if (follows.length > 0) {
-        // Unfollow
-        await room.collection('user_follows').delete(follows[0].id);
-        followedUsers.delete(currentUserFilter);
-      } else {
-        // Follow
-        await room.collection('user_follows').create({
-          follower: room.party.client.username,
-          following: currentUserFilter,
-          timestamp: new Date().toISOString()
-        });
-        followedUsers.add(currentUserFilter);
-      }
-      
-      renderGallery();
     }
 
     window.addEventListener('load', async () => {

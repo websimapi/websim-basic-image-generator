@@ -1,71 +1,123 @@
-let imageCounter = 0;
-let currentImage = null;
-let originalImageData = null;
-let currentSelection = null;
-let isShiftPressed = false;
-let isCtrlPressed = false;
-let selectionCanvas = null;
-let selectionCtx = null;
+const EDITOR_STATE = {
+  currentImage: null,
+  originalImageData: null,
+  currentSelection: null,
+  isShiftPressed: false,
+  isCtrlPressed: false,
+  selectionCanvas: null,
+  selectionCtx: null,
+  currentTextPosition: null,
+  textPreview: null
+};
 
-function setupImageEditor() {
-  const canvas = document.getElementById('editCanvas');
-  const ctx = canvas.getContext('2d');
-  const editorControls = document.getElementById('editorControls');
-  const fillImagePrompt = document.getElementById('fillImagePrompt');
-  const loadingSpinner = document.getElementById('loadingSpinner');
-  const placeholderText = document.getElementById('placeholderText');
+function initializeEditor() {
+  setupEventListeners();
+  setupColorPicker();
+}
 
-  loadingSpinner.style.display = 'none';
-  placeholderText.style.display = 'none';
-
-  if (currentImage) {
-    canvas.width = currentImage.naturalWidth;
-    canvas.height = currentImage.naturalHeight;
-    ctx.drawImage(currentImage, 0, 0);
-    originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    currentImage.style.display = 'none';
-    canvas.style.display = 'block';
-    editorControls.style.display = 'flex';
-  } else {
-    canvas.style.display = 'none';
-    editorControls.style.display = 'flex';
-  }
-
-  fillImagePrompt.style.display = 'none';
+function setupEventListeners() {
+  document.addEventListener('keydown', handleKeyDown);
+  document.addEventListener('keyup', handleKeyUp);
   
+  const canvas = document.getElementById('editCanvas');
   if (!canvas.hasEventListener) {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.hasEventListener = true;
   }
 }
 
-function handleCanvasClick(e) {
+function setupColorPicker() {
+  // Implementation for setupColorPicker
+}
+
+function handleKeyDown(event) {
+  if (event.key === 'Shift') {
+    EDITOR_STATE.isShiftPressed = true;
+  } else if (event.key === 'Control') {
+    EDITOR_STATE.isCtrlPressed = true;
+  }
+}
+
+function handleKeyUp(event) {
+  if (event.key === 'Shift') {
+    EDITOR_STATE.isShiftPressed = false;
+  } else if (event.key === 'Control') {
+    EDITOR_STATE.isCtrlPressed = false;
+  }
+}
+
+function setupImageEditor(image) {
+  EDITOR_STATE.currentImage = image;
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-  if (!isShiftPressed && !isCtrlPressed) {
-    currentSelection = null;
+  if (image) {
+    setupCanvas(canvas, ctx, image);
+    showEditorControls();
+  } else {
+    hideCanvas();
+  }
+}
+
+function setupCanvas(canvas, ctx, image) {
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  ctx.drawImage(image, 0, 0);
+  EDITOR_STATE.originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  image.style.display = 'none';
+  canvas.style.display = 'block';
+}
+
+function showEditorControls() {
+  const editorControls = document.getElementById('editorControls');
+  editorControls.style.display = 'flex';
+}
+
+function hideCanvas() {
+  const canvas = document.getElementById('editCanvas');
+  canvas.style.display = 'none';
+}
+
+function handleCanvasClick(e) {
+  const canvas = document.getElementById('editCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const coordinates = getCanvasCoordinates(e, rect, canvas);
+
+  const activeTool = document.querySelector('.tool-button.active');
+  if (activeTool?.id === 'textTool') {
+    handleTextTool(e.clientX, e.clientY, coordinates.x, coordinates.y);
+    return;
   }
 
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
+  handleSelectionTool(coordinates, canvas);
+}
 
-  if (isShiftPressed || isCtrlPressed) {
-    if (currentSelection) {
-      for (let i = 0; i < currentSelection.length; i++) {
-        currentSelection[i] = currentSelection[i] || newSelection[i];
+function getCanvasCoordinates(event, rect, canvas) {
+  return {
+    x: (event.clientX - rect.left) * (canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function handleSelectionTool(coordinates, canvas) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const newSelection = magicWandSelect(imageData, Math.round(coordinates.x), Math.round(coordinates.y), 32);
+
+  if (EDITOR_STATE.isShiftPressed || EDITOR_STATE.isCtrlPressed) {
+    if (EDITOR_STATE.currentSelection) {
+      for (let i = 0; i < EDITOR_STATE.currentSelection.length; i++) {
+        EDITOR_STATE.currentSelection[i] = EDITOR_STATE.currentSelection[i] || newSelection[i];
       }
     } else {
-      currentSelection = newSelection;
+      EDITOR_STATE.currentSelection = newSelection;
     }
   } else {
-    currentSelection = newSelection;
+    EDITOR_STATE.currentSelection = newSelection;
   }
 
-  drawSelectionOverlay();
+  drawSelectionOverlay(canvas);
 }
 
 function magicWandSelect(imageData, startX, startY, tolerance) {
@@ -116,13 +168,12 @@ function magicWandSelect(imageData, startX, startY, tolerance) {
   return selected;
 }
 
-function drawSelectionOverlay() {
-  const canvas = document.getElementById('editCanvas');
+function drawSelectionOverlay(canvas) {
   const ctx = canvas.getContext('2d');
   
-  ctx.putImageData(originalImageData, 0, 0);
+  ctx.putImageData(EDITOR_STATE.originalImageData, 0, 0);
   
-  if (!currentSelection) return;
+  if (!EDITOR_STATE.currentSelection) return;
   
   const width = canvas.width;
   const height = canvas.height;
@@ -132,12 +183,12 @@ function drawSelectionOverlay() {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pos = y * width + x;
-      if (currentSelection[pos]) {
+      if (EDITOR_STATE.currentSelection[pos]) {
         const isEdge = 
-          x > 0 && !currentSelection[pos - 1] || 
-          x < width - 1 && !currentSelection[pos + 1] || 
-          y > 0 && !currentSelection[pos - width] || 
-          y < height - 1 && !currentSelection[pos + width];
+          x > 0 && !EDITOR_STATE.currentSelection[pos - 1] || 
+          x < width - 1 && !EDITOR_STATE.currentSelection[pos + 1] || 
+          y > 0 && !EDITOR_STATE.currentSelection[pos - width] || 
+          y < height - 1 && !EDITOR_STATE.currentSelection[pos + width];
           
         if (isEdge) {
           ctx.fillStyle = 'white';
@@ -148,6 +199,78 @@ function drawSelectionOverlay() {
       }
     }
   }
+}
+
+function handleTextTool(clientX, clientY, canvasX, canvasY) {
+  removeExistingTextPreview();
+  createTextPreview(clientX, clientY);
+  positionTextControls(clientX, clientY);
+  setTextPosition(canvasX, canvasY);
+}
+
+function removeExistingTextPreview() {
+  if (EDITOR_STATE.textPreview) {
+    EDITOR_STATE.textPreview.remove();
+  }
+}
+
+function createTextPreview(clientX, clientY) {
+  const textPreview = document.createElement('div');
+  textPreview.style.position = 'absolute';
+  textPreview.style.top = clientY + 'px';
+  textPreview.style.left = clientX + 'px';
+  textPreview.style.color = 'black';
+  textPreview.style.fontSize = '24px';
+  textPreview.textContent = 'Text Preview';
+  document.body.appendChild(textPreview);
+  EDITOR_STATE.textPreview = textPreview;
+}
+
+function positionTextControls(clientX, clientY) {
+  const textControls = document.getElementById('textControls');
+  textControls.style.position = 'absolute';
+  textControls.style.top = clientY + 'px';
+  textControls.style.left = clientX + 'px';
+}
+
+function setTextPosition(canvasX, canvasY) {
+  EDITOR_STATE.currentTextPosition = { x: canvasX, y: canvasY };
+}
+
+async function commitText() {
+  if (!EDITOR_STATE.currentTextPosition) return;
+  
+  const text = document.getElementById('textInput').value.trim();
+  if (!text) {
+    cancelText();
+    return;
+  }
+  
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const textSettings = getTextSettings();
+  
+  applyTextToCanvas(ctx, text, textSettings);
+  await handleTextModification(text, textSettings);
+  
+  cancelText();
+}
+
+function cancelText() {
+  EDITOR_STATE.currentTextPosition = null;
+  removeExistingTextPreview();
+}
+
+function getTextSettings() {
+  // Implementation for getTextSettings
+}
+
+function applyTextToCanvas(ctx, text, textSettings) {
+  // Implementation for applyTextToCanvas
+}
+
+async function handleTextModification(text, textSettings) {
+  // Implementation for handleTextModification
 }
 
 function setTool(tool) {
@@ -165,19 +288,19 @@ function setTool(tool) {
 
   switch (tool) {
     case 'fillSelection':
-      if (currentSelection) {
+      if (EDITOR_STATE.currentSelection) {
         fillImagePrompt.style.display = 'none';
         fillSelection();
       }
       break;
     case 'setAlpha':
-      if (currentSelection) {
+      if (EDITOR_STATE.currentSelection) {
         fillImagePrompt.style.display = 'none';
         setSelectionAlpha();
       }
       break;
     case 'fillWithImage':
-      if (currentSelection) {
+      if (EDITOR_STATE.currentSelection) {
         fillImagePrompt.style.display = 'flex';
       }
       break;
@@ -189,7 +312,7 @@ function setTool(tool) {
 }
 
 function fillSelection() {
-  if (!currentSelection) return;
+  if (!EDITOR_STATE.currentSelection) return;
   
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
@@ -201,8 +324,8 @@ function fillSelection() {
   const g = parseInt(color.substr(3, 2), 16);
   const b = parseInt(color.substr(5, 2), 16);
   
-  for (let i = 0; i < currentSelection.length; i++) {
-    if (currentSelection[i]) {
+  for (let i = 0; i < EDITOR_STATE.currentSelection.length; i++) {
+    if (EDITOR_STATE.currentSelection[i]) {
       const pixelPos = i * 4;
       pixels[pixelPos] = r;
       pixels[pixelPos + 1] = g;
@@ -211,38 +334,44 @@ function fillSelection() {
   }
   
   ctx.putImageData(imageData, 0, 0);
-  originalImageData = imageData;
+  EDITOR_STATE.originalImageData = imageData;
 }
 
 function setSelectionAlpha() {
-  if (!currentSelection) return;
+  if (!EDITOR_STATE.currentSelection) return;
   
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = imageData.data;
   
-  for (let i = 0; i < currentSelection.length; i++) {
-    if (currentSelection[i]) {
+  for (let i = 0; i < EDITOR_STATE.currentSelection.length; i++) {
+    if (EDITOR_STATE.currentSelection[i]) {
       const pixelPos = i * 4;
       pixels[pixelPos + 3] = 0;
     }
   }
   
   ctx.putImageData(imageData, 0, 0);
-  originalImageData = imageData;
+  EDITOR_STATE.originalImageData = imageData;
 }
 
 function clearSelection() {
-  currentSelection = null;
+  EDITOR_STATE.currentSelection = null;
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
-  ctx.putImageData(originalImageData, 0, 0);
+  ctx.putImageData(EDITOR_STATE.originalImageData, 0, 0);
 }
 
 function resetImage() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
-  ctx.putImageData(originalImageData, 0, 0);
-  currentSelection = null;
+  ctx.putImageData(EDITOR_STATE.originalImageData, 0, 0);
+  EDITOR_STATE.currentSelection = null;
 }
+
+export {
+  initializeEditor,
+  setupImageEditor,
+  EDITOR_STATE
+};
