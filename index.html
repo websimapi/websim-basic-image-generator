@@ -569,15 +569,20 @@
       background: #f44336;
     }
 
-    .follow-button.following:hover::before {
-      content: 'Unfollow';
-    }
-
-    .follow-button.following span {
+    .follow-button .follow-text,
+    .follow-button .unfollow-text {
       display: none;
     }
 
-    .follow-button.following:hover span {
+    .follow-button:not(.following) .follow-text {
+      display: inline;
+    }
+
+    .follow-button.following:not(:hover) .following-text {
+      display: inline;  
+    }
+    
+    .follow-button.following:hover .unfollow-text {
       display: inline;
     }
   </style>
@@ -707,7 +712,11 @@
         </div>
         <div id="userFilterInfo" style="display: none; align-items: center; gap: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px;">
           <span>Showing images by: <strong id="userFilterName"></strong></span>
-          <button id="followButton" onclick="toggleFollow()" class="follow-button">Follow</button>
+          <button id="followButton" onclick="toggleFollow()" class="follow-button">
+            <span class="follow-text">Follow</span>
+            <span class="following-text">Following</span>
+            <span class="unfollow-text">Unfollow</span>
+          </button>
           <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
         </div>
         <div class="search-container">
@@ -794,10 +803,18 @@
         followButton.style.display = 'block';
         if (currentlyFollowing.has(currentUserFilter)) {
           followButton.classList.add('following');
-          followButton.innerHTML = '<span>Following</span>';
+          followButton.innerHTML = `
+            <span class="follow-text">Follow</span>
+            <span class="following-text">Following</span>
+            <span class="unfollow-text">Unfollow</span>
+          `;
         } else {
           followButton.classList.remove('following');
-          followButton.textContent = 'Follow';
+          followButton.innerHTML = `
+            <span class="follow-text">Follow</span>
+            <span class="following-text">Following</span>
+            <span class="unfollow-text">Unfollow</span>
+          `;
         }
       }
 
@@ -1640,6 +1657,17 @@
         if (!e.ctrlKey) isCtrlPressed = false;
       });
 
+      function updateUserFilterUI(show) {
+        const filterInfo = document.getElementById('userFilterInfo');
+        if (show) {
+          filterInfo.style.display = 'flex';
+          document.getElementById('userFilterName').textContent = currentUserFilter;
+          updateFollowButton();
+        } else {
+          filterInfo.style.display = 'none';
+        }
+      }
+
       function editImage(id) {
         const image = galleryImages.find(img => img.id === id);
         if (!image) return;
@@ -1689,17 +1717,6 @@
         const searchInput = document.getElementById('gallerySearch');
         currentSearch = searchInput.value.trim();
         renderGallery();
-      }
-
-      function updateUserFilterUI(show) {
-        const filterInfo = document.getElementById('userFilterInfo');
-        if (show) {
-          filterInfo.style.display = 'flex';
-          document.getElementById('userFilterName').textContent = currentUserFilter;
-          updateFollowButton();
-        } else {
-          filterInfo.style.display = 'none';
-        }
       }
 
       function renderPromptHistory(image) {
