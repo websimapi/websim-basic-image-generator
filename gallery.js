@@ -9,7 +9,8 @@ const state = {
   currentPage: 1,
   currentUserFilter: null,
   itemsPerPage: 10,
-  following: new Set()
+  following: new Set(),
+  showRemixes: true
 };
 
 // Initialize following from localStorage
@@ -25,7 +26,7 @@ function saveFollowing() {
   localStorage.setItem('following', JSON.stringify([...state.following]));
 }
 
-// Following management
+// Following management 
 function followUser(username) {
   if (username === room.party.client.username) return;
   state.following.add(username);
@@ -41,6 +42,12 @@ function unfollowUser(username) {
 
 function isFollowing(username) {
   return state.following.has(username);
+}
+
+// Add showRemixes state and toggle function
+function toggleRemixes() {
+  state.showRemixes = !state.showRemixes;
+  renderGallery();
 }
 
 // Gallery initialization and subscription
@@ -69,6 +76,7 @@ const galleryFilters = {
     if (!username) return images;
     return images.filter(img => {
       const isCreator = img.username === username;
+      if (!state.showRemixes) return isCreator;
       const hasModifications = img.promptHistory?.some(entry => 
         entry.username === username
       );
@@ -388,39 +396,47 @@ function setupImageEditor() {
 }
 
 function updateUserFilterUI(show) {
-  const filterInfo = document.getElementById('userFilterInfo');
+  const filterInfo = document.getElementById('userFilterInfo'); 
   if (show) {
-    filterInfo.style.display = 'flex';
-    document.getElementById('userFilterName').textContent = state.currentUserFilter;
-    
-    // Handle follow button visibility/state
-    const followButtonContainer = document.getElementById('userFilterFollowButton');
-    if (state.currentUserFilter === room.party.client.username) {
-      followButtonContainer.style.display = 'none';
-    } else {
-      followButtonContainer.style.display = 'block';
-      const isFollowing = state.following.has(state.currentUserFilter);
-      followButtonContainer.innerHTML = `
+    const username = state.currentUserFilter;
+    const isCurrentUser = username === room.party.client.username;
+
+    filterInfo.innerHTML = `
+      <span>Showing images by: <strong>${username}</strong></span>
+      ${!isCurrentUser ? `
         <button 
-          class="follow-button ${isFollowing ? 'following' : ''}" 
-          onclick="toggleFollow('${state.currentUserFilter}')"
+          class="follow-button ${isFollowing(username) ? 'following' : ''}"
+          onclick="toggleFollow('${username}')"
         >
-          ${isFollowing ? 'Following' : 'Follow'}
+          ${isFollowing(username) ? 'Following' : 'Follow'} 
         </button>
-      `;
-    }
+      ` : ''}
+      <div class="remix-toggle">
+        <input 
+          type="checkbox" 
+          id="showRemixes"
+          ${state.showRemixes ? 'checked' : ''} 
+          onchange="toggleRemixes()"
+        >
+        <label for="showRemixes">Show Remixes</label>
+      </div>
+      <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
+    `;
+    filterInfo.style.display = 'flex';
   } else {
     filterInfo.style.display = 'none';
   }
 }
 
+function clearUserFilter() {
+  state.currentUserFilter = null;
+  state.currentPage = 1; // Reset to first page when clearing filter
+  renderGallery();
+}
+
 function showUserGallery(username) {
-  if (username === room.party.client.username) {
-    state.currentTab = 'my';
-  } else {
-    state.currentUserFilter = username;
-    state.currentPage = 1; // Reset to first page
-    state.currentTab = 'recent'; // Reset to recent tab when viewing specific user
-  }
-  renderGallery(); 
+  state.currentUserFilter = username;
+  state.currentPage = 1; // Reset to first page when filtering
+  state.currentTab = 'recent'; // Reset to recent tab
+  renderGallery();
 }
