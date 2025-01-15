@@ -569,21 +569,20 @@
       background: #f44336;
     }
 
-    .follow-button .follow-text,
-    .follow-button .unfollow-text {
+    .follow-button.following .follow-text {
       display: none;
     }
 
-    .follow-button:not(.following) .follow-text {
+    .follow-button.following .unfollow-text {
       display: inline;
     }
 
-    .follow-button.following:not(:hover) .following-text {
-      display: inline;  
-    }
-    
-    .follow-button.following:hover .unfollow-text {
+    .follow-button .follow-text {
       display: inline;
+    }
+
+    .follow-button .unfollow-text {
+      display: none;
     }
   </style>
 </head>
@@ -714,7 +713,6 @@
           <span>Showing images by: <strong id="userFilterName"></strong></span>
           <button id="followButton" onclick="toggleFollow()" class="follow-button">
             <span class="follow-text">Follow</span>
-            <span class="following-text">Following</span>
             <span class="unfollow-text">Unfollow</span>
           </button>
           <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
@@ -801,21 +799,12 @@
         }
         
         followButton.style.display = 'block';
-        if (currentlyFollowing.has(currentUserFilter)) {
-          followButton.classList.add('following');
-          followButton.innerHTML = `
-            <span class="follow-text">Follow</span>
-            <span class="following-text">Following</span>
-            <span class="unfollow-text">Unfollow</span>
-          `;
-        } else {
-          followButton.classList.remove('following');
-          followButton.innerHTML = `
-            <span class="follow-text">Follow</span>
-            <span class="following-text">Following</span>
-            <span class="unfollow-text">Unfollow</span>
-          `;
-        }
+        const isFollowing = currentlyFollowing.has(currentUserFilter);
+        followButton.className = isFollowing ? 'follow-button following' : 'follow-button';
+        followButton.innerHTML = `
+          <span class="follow-text">Follow</span>
+          <span class="unfollow-text">Unfollow</span>
+        `;
       }
 
       async function toggleFollow() {
@@ -839,6 +828,9 @@
           }
           
           updateFollowButton();
+          if (currentTab === 'following') {
+            renderGallery();
+          }
         } catch (error) {
           console.error('Error toggling follow:', error);
           alert('Failed to update follow status. Please try again.');
@@ -1657,17 +1649,6 @@
         if (!e.ctrlKey) isCtrlPressed = false;
       });
 
-      function updateUserFilterUI(show) {
-        const filterInfo = document.getElementById('userFilterInfo');
-        if (show) {
-          filterInfo.style.display = 'flex';
-          document.getElementById('userFilterName').textContent = currentUserFilter;
-          updateFollowButton();
-        } else {
-          filterInfo.style.display = 'none';
-        }
-      }
-
       function editImage(id) {
         const image = galleryImages.find(img => img.id === id);
         if (!image) return;
@@ -1717,6 +1698,32 @@
         const searchInput = document.getElementById('gallerySearch');
         currentSearch = searchInput.value.trim();
         renderGallery();
+      }
+
+      function updateUserFilterUI(show) {
+        const filterInfo = document.getElementById('userFilterInfo');
+        if (show) {
+          filterInfo.style.display = 'flex';
+          document.getElementById('userFilterName').textContent = currentUserFilter;
+          
+          const followButtonHtml = `
+            <button id="followButton" onclick="toggleFollow()" class="follow-button">
+              <span class="follow-text">Follow</span>
+              <span class="unfollow-text">Unfollow</span>
+            </button>
+          `;
+          
+          // Update the userFilterInfo content
+          filterInfo.innerHTML = `
+            <span>Showing images by: <strong id="userFilterName">${currentUserFilter}</strong></span>
+            ${followButtonHtml}
+            <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
+          `;
+          
+          updateFollowButton();
+        } else {
+          filterInfo.style.display = 'none';
+        }
       }
 
       function renderPromptHistory(image) {
