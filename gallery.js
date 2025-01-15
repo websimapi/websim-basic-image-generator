@@ -8,16 +8,37 @@ const state = {
   currentSearch: '',
   currentPage: 1,
   currentUserFilter: null,
-  itemsPerPage: 10
+  itemsPerPage: 10,
+  hideRemixes: false,
+  followedUsers: new Set()
 };
 
 // Gallery initialization and subscription
 async function initGallery() {
+  // Load followed users from persistence
+  const followedUsersRecord = await room.collection('followed_users')
+    .filter({ username: room.party.client.username })
+    .getList();
+    
+  if (followedUsersRecord.length > 0) {
+    state.followedUsers = new Set(followedUsersRecord[0].following);
+  }
+
   state.galleryImages = await room.collection('gallery_images').getList();
   room.collection('gallery_images').subscribe(images => {
     state.galleryImages = images;
     renderGallery();
   });
+
+  // Subscribe to followed users changes
+  room.collection('followed_users').subscribe(records => {
+    const userRecord = records.find(r => r.username === room.party.client.username);
+    if (userRecord) {
+      state.followedUsers = new Set(userRecord.following);
+    }
+    renderGallery();
+  });
+
   renderGallery();
 }
 
@@ -53,6 +74,7 @@ const galleryFilters = {
       );
       return isOriginalCreator || hasModifications;
     }),
+    following: (images, followedUsers) => images.filter(img => followedUsers.has(img.username)),
     recent: (images) => [...images].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }
 };
@@ -75,10 +97,11 @@ function renderGallery() {
   }
 
   // Apply tab-specific filtering
-  filteredImages = galleryFilters.tabFilter[state.currentTab](
-    filteredImages, 
-    room.party.client.username
-  );
+  if (state.currentTab === 'following') {
+    filteredImages = galleryFilters.tabFilter[state.currentTab](filteredImages, state.followedUsers);
+  } else {
+    filteredImages = galleryFilters.tabFilter[state.currentTab](filteredImages, room.party.client.username);
+  }
 
   // Pagination
   const totalPages = Math.ceil(filteredImages.length / state.itemsPerPage);
