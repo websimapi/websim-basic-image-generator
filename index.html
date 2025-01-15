@@ -545,9 +545,70 @@
     .clear-filter-button:hover {
       background: #d32f2f;
     }
+
+    .announcement-container {
+      width: 100%;
+      background: rgba(33, 150, 243, 0.1);
+      border-left: 4px solid #2196F3;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .announcement-content {
+      color: var(--text-primary);
+      font-size: 1.1rem;
+      line-height: 1.5;
+      margin-bottom: 0.5rem;
+    }
+
+    .announcement-controls {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+    }
+
+    .edit-announcement-btn {
+      background: #2196F3;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      min-width: auto;
+    }
+
+    #editAnnouncementDialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--background-secondary);
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    #announcementInput {
+      width: 100%;
+      margin: 1rem 0;
+      padding: 0.8rem;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-family: inherit;
+      resize: vertical;
+    }
   </style>
 </head>
 <body>
+  <div class="announcement-container" style="display: none;">
+    <div class="announcement-content"></div>
+    <div class="announcement-controls" style="display: none;">
+      <button onclick="editAnnouncement()" class="edit-announcement-btn">Edit Announcement</button>
+    </div>
+  </div>
   <div class="container">
     <h1>AI Image Editor</h1>
     
@@ -696,6 +757,17 @@
       <div class="dialog-buttons">
         <button onclick="cancelTitleEdit()">Cancel</button>
         <button onclick="saveTitleEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editAnnouncementDialog" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Edit Announcement</h3>
+      <textarea id="announcementInput" rows="4" placeholder="Enter announcement message..."></textarea>
+      <div class="dialog-buttons">
+        <button onclick="saveAnnouncement()">Save</button>
+        <button onclick="cancelAnnouncementEdit()">Cancel</button>
       </div>
     </div>
   </div>
@@ -1721,10 +1793,90 @@
       dialog.style.display = 'none';
     }
 
+    async function initializeAnnouncements() {
+      // Subscribe to announcements collection
+      room.collection('announcements').subscribe(announcements => {
+        const latestAnnouncement = announcements[0]; // Get the most recent announcement
+        updateAnnouncementDisplay(latestAnnouncement);
+      });
+      
+      // Check if current user is api
+      const isAdmin = room.party.client.username === 'api';
+      const announcementControls = document.querySelector('.announcement-controls');
+      if (isAdmin) {
+        announcementControls.style.display = 'flex';
+      }
+    }
+
+    function updateAnnouncementDisplay(announcement) {
+      const container = document.querySelector('.announcement-container');
+      const content = document.querySelector('.announcement-content');
+      
+      if (announcement && announcement.message) {
+        content.textContent = announcement.message;
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function editAnnouncement() {
+      if (room.party.client.username !== 'api') return;
+      
+      const dialog = document.getElementById('editAnnouncementDialog');
+      const input = document.getElementById('announcementInput');
+      
+      // Get current announcement if it exists
+      room.collection('announcements').getList().then(announcements => {
+        const currentAnnouncement = announcements[0];
+        if (currentAnnouncement) {
+          input.value = currentAnnouncement.message;
+        }
+      });
+      
+      dialog.style.display = 'block';
+    }
+
+    async function saveAnnouncement() {
+      if (room.party.client.username !== 'api') return;
+      
+      const input = document.getElementById('announcementInput');
+      const message = input.value.trim();
+      
+      if (message) {
+        // Get current announcement if it exists
+        const announcements = await room.collection('announcements').getList();
+        const currentAnnouncement = announcements[0];
+        
+        if (currentAnnouncement) {
+          // Update existing announcement
+          await room.collection('announcements').update(currentAnnouncement.id, {
+            message: message,
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          // Create new announcement
+          await room.collection('announcements').create({
+            message: message
+          });
+        }
+      }
+      
+      cancelAnnouncementEdit();
+    }
+
+    function cancelAnnouncementEdit() {
+      const dialog = document.getElementById('editAnnouncementDialog');
+      const input = document.getElementById('announcementInput');
+      input.value = '';
+      dialog.style.display = 'none';
+    }
+
     window.addEventListener('load', async () => {
       room = new WebsimSocket();
       await initGallery();
       setupImageEditor();
+      initializeAnnouncements();
     });
 
     document.getElementById('promptInput').addEventListener('keypress', function (e) {
