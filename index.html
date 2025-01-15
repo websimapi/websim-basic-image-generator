@@ -570,6 +570,40 @@
     .clear-filter-button:hover {
       background: #d32f2f;
     }
+
+    .user-gallery-info {
+      background: rgba(255,255,255,0.1);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .follow-button {
+      background: #2196F3;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .follow-button.following {
+      background: #f44336;
+    }
+
+    .follow-button:hover {
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
@@ -693,6 +727,13 @@
           <button class="gallery-tab active" onclick="showGalleryTab('recent')">Recent</button>
           <button class="gallery-tab" onclick="showGalleryTab('popular')">Popular</button>
           <button class="gallery-tab" onclick="showGalleryTab('my')">My Images</button>
+          <button class="gallery-tab" onclick="showGalleryTab('following')">Following</button>
+        </div>
+        <div id="userGalleryInfo" style="display: none;" class="user-gallery-info">
+          <div class="user-info">
+            <h3 id="galleryUsername"></h3>
+            <button id="followButton" onclick="toggleFollow()">Follow</button>
+          </div>
         </div>
         <div class="gallery-controls">
           <label class="remix-toggle">
@@ -749,6 +790,25 @@
       let textPreview = null;
       let currentUserFilter = null;
       let showRemixes = true;
+      let following = new Set();
+
+      async function initializeFollowing() {
+        const followingList = await room.collection('following').filter({
+          follower: room.party.client.username
+        }).getList();
+        
+        following = new Set(followingList.map(f => f.following));
+        
+        // Subscribe to following changes
+        room.collection('following').subscribe(followingList => {
+          following = new Set(
+            followingList
+              .filter(f => f.follower === room.party.client.username)
+              .map(f => f.following)
+          );
+          renderGallery();
+        });
+      }
 
       async function initGallery() {
         galleryImages = await room.collection('gallery_images').getList();
@@ -802,6 +862,9 @@
               );
               return isOriginalCreator || hasModifications;
             });
+            break;
+          case 'following':
+            images = images.filter(img => following.has(img.username));
             break;
           default: // recent
             images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -1710,7 +1773,20 @@
 
       function showUserGallery(username) {
         currentUserFilter = username;
-        currentPage = 1;  // Reset to first page
+        currentPage = 1;  
+        
+        // Show user gallery info if not viewing own gallery
+        const userGalleryInfo = document.getElementById('userGalleryInfo');
+        const galleryUsername = document.getElementById('galleryUsername');
+        
+        if (username === room.party.client.username) {
+          userGalleryInfo.style.display = 'none';
+        } else {
+          userGalleryInfo.style.display = 'flex';
+          galleryUsername.textContent = username;
+          updateFollowButton();
+        }
+        
         renderGallery();
       }
 
@@ -1757,9 +1833,46 @@
         dialog.style.display = 'none';
       }
 
+      async function toggleFollow() {
+        const username = currentUserFilter;
+        if (!username || username === room.party.client.username) return;
+
+        const isFollowing = following.has(username);
+        
+        if (isFollowing) {
+          // Unfollow
+          const followRecord = await room.collection('following').filter({
+            follower: room.party.client.username,
+            following: username
+          }).getList();
+          
+          if (followRecord.length > 0) {
+            await room.collection('following').delete(followRecord[0].id);
+          }
+        } else {
+          // Follow
+          await room.collection('following').create({
+            follower: room.party.client.username,
+            following: username
+          });
+        }
+
+        updateFollowButton();
+      }
+
+      function updateFollowButton() {
+        const followButton = document.getElementById('followButton');
+        if (!followButton) return;
+
+        const isFollowing = following.has(currentUserFilter);
+        followButton.textContent = isFollowing ? 'Unfollow' : 'Follow';
+        followButton.classList.toggle('following', isFollowing);
+      }
+
       window.addEventListener('load', async () => {
         room = new WebsimSocket();
         await initGallery();
+        await initializeFollowing();
         setupImageEditor();
       });
 
