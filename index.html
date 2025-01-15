@@ -680,7 +680,10 @@
 
         <div id="userFilterInfo" style="display: none; align-items: center; gap: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px;">
           <span>Showing images by: <strong id="userFilterName"></strong></span>
-          <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="follow-button" id="userFilterFollowButton" onclick="toggleFollowFilteredUser()" style="display: none;">Follow</button>
+            <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
+          </div>
         </div>
         <div class="search-container">
           <input type="text" id="gallerySearch" placeholder="Search images by title or username..." onkeyup="filterGallery()">
@@ -1684,11 +1687,13 @@
         currentUserFilter = username;
         currentPage = 1;  // Reset to first page
         renderGallery();
+        updateUserFilterFollowButton();
       }
 
       function clearUserFilter() {
         currentUserFilter = null;
         renderGallery();
+        updateUserFilterFollowButton();
       }
 
       let currentEditTitleId = null;
@@ -1727,6 +1732,30 @@
         const input = document.getElementById('editTitleInput');
         input.value = '';
         dialog.style.display = 'none';
+      }
+
+      function toggleFollowFilteredUser() {
+        if (!currentUserFilter) return;
+        if (currentUserFilter === room.party.client.username) return;
+        
+        if (isFollowing(currentUserFilter)) {
+          unfollowUser(currentUserFilter);
+        } else {
+          followUser(currentUserFilter);
+        }
+        updateUserFilterFollowButton();
+      }
+
+      function updateUserFilterFollowButton() {
+        const followButton = document.getElementById('userFilterFollowButton');
+        if (!currentUserFilter || currentUserFilter === room.party.client.username) {
+          followButton.style.display = 'none';
+          return;
+        }
+        
+        followButton.style.display = 'block';
+        followButton.textContent = isFollowing(currentUserFilter) ? 'Following' : 'Follow';
+        followButton.classList.toggle('following', isFollowing(currentUserFilter));
       }
 
       window.addEventListener('load', async () => {

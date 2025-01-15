@@ -35,7 +35,7 @@ function followUser(username) {
 
 function unfollowUser(username) {
   state.following.delete(username);
-  saveFollowing(); 
+  saveFollowing();
   renderGallery();
 }
 
