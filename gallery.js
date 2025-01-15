@@ -173,7 +173,7 @@ function createGalleryItemHTML(img) {
       class="follow-button ${isFollowing(img.username) ? 'following' : ''}" 
       onclick="toggleFollow('${img.username}')"
     >
-      ${isFollowing(img.username) ? 'Following' : 'Follow'}
+      ${isFollowing(img.username) ? 'Unfollow' : 'Follow'}
     </button>
   ` : '';
 
