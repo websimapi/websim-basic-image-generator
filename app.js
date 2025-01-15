@@ -11,55 +11,195 @@ const EDITOR_STATE = {
   textPreview: null
 };
 
-async function initGallery() {
-  const galleryImages = await room.collection('gallery_images').getList();
-  room.collection('gallery_images').subscribe(images => {
-    renderGallery(images);
-  });
-  renderGallery(galleryImages);
-}
+let galleryImages = [];
 
-function renderGallery(galleryImages) {
-  const galleryEl = document.getElementById('gallery');
-  let images = [...galleryImages];
-  
-  images = images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
-  const start = 0;
-  const end = 10;
-  const paginatedImages = images.slice(start, end);
-  
-  if (paginatedImages.length === 0) {
-    galleryEl.innerHTML = `
-      <div class="no-results">
-        No images available
-      </div>
-    `;
+// Initialize application
+window.addEventListener('load', async () => {
+  await initGallery();
+  setupEditorControls();
+});
+
+// Generate image
+function generateImage() {
+  const prefixSelect = document.getElementById('prefixPrompt');
+  const promptInput = document.getElementById('promptInput');
+  const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+
+  const imageContainer = document.getElementById('imageContainer');
+  const loadingSpinner = document.getElementById('loadingSpinner');
+  const placeholderText = document.getElementById('placeholderText');
+  const saveButton = document.getElementById('saveButton');
+  const addGalleryButton = document.getElementById('addGalleryButton');
+
+  if (!promptInput.value.trim()) {
+    alert('Please enter a prompt!');
     return;
   }
+
+  loadingSpinner.style.display = 'block';
+  placeholderText.style.display = 'none';
+  saveButton.style.display = 'none';
+  addGalleryButton.style.display = 'none';
+
+  const existingImages = imageContainer.querySelectorAll('img');
+  existingImages.forEach(img => img.remove());
+
+  const generatedImage = document.createElement('img');
+  generatedImage.id = `generatedImage_${Date.now()}`;
+  generatedImage.className = 'generated-image';
+  generatedImage.style.display = 'none';
+  generatedImage.crossOrigin = 'anonymous';
   
-  galleryEl.innerHTML = paginatedImages.map(img => `
-    <div class="gallery-item">
-      <div 
-        class="gallery-item-image" 
-        style="background-image: url('${img.imageUrl}')"
-        onclick="loadGalleryImage('${img.id}')"
-        role="img" 
-        aria-label="${img.prompt}"
-      ></div>
-      <div class="metadata">
-        <div>${img.prompt}</div>
-        <div>by ${img.username}</div>
-        <div>${new Date(img.created_at).toLocaleDateString()}</div>
-      </div>
-      <div class="stats">
-        <span>${img.views || 0} views</span>
-        <span>${img.uses || 0} uses</span>
-      </div>
-    </div>
-  `).join('');
+  generatedImage.src = fullPrompt;
+  generatedImage.alt = fullPrompt;
+
+  generatedImage.onload = async function() {
+    if (generatedImage.dataset.processed) return;
+    generatedImage.dataset.processed = true;
+
+    loadingSpinner.style.display = 'none';
+    generatedImage.style.display = 'block';
+    placeholderText.style.display = 'none';
+    saveButton.style.display = 'block';
+    addGalleryButton.style.display = 'block';
+    EDITOR_STATE.currentImage = generatedImage;
+
+    try {
+      const galleryEntry = await room.collection('gallery_images').create({
+        prompt: fullPrompt,
+        imageUrl: generatedImage.src, 
+        views: 0,
+        uses: 0,
+        promptHistory: [{
+          prompt: fullPrompt,
+          timestamp: new Date().toISOString(),
+          username: room.party.client.username
+        }]
+      });
+
+      generatedImage.dataset.galleryId = galleryEntry.id;
+      setupImageEditor();
+    } catch (error) {
+      console.error('Error processing generated image:', error);
+      alert('Failed to process generated image. Please try again.');
+    }
+  };
+
+  imageContainer.appendChild(generatedImage);
 }
 
+// Handle image upload
+function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imageContainer = document.getElementById('imageContainer');
+    const existingImages = imageContainer.querySelectorAll('img');
+    existingImages.forEach(img => img.remove());
+
+    const uploadedImage = document.createElement('img');
+    uploadedImage.id = `uploadedImage_${Date.now()}`;
+    uploadedImage.className = 'generated-image';
+    uploadedImage.style.display = 'block';
+    uploadedImage.src = e.target.result;
+    uploadedImage.alt = 'Uploaded Image';
+    uploadedImage.crossOrigin = 'anonymous';
+
+    imageContainer.appendChild(uploadedImage);
+    EDITOR_STATE.currentImage = uploadedImage;
+    setupImageEditor();
+    document.getElementById('saveButton').style.display = 'block';
+    document.getElementById('addGalleryButton').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Save image
+function saveImage() {
+  const canvas = document.getElementById('editCanvas');
+  const link = document.createElement('a');
+  link.download = 'edited-image.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// Add image to gallery
+async function addToGallery() {
+  const canvas = document.getElementById('editCanvas');
+  const promptInput = document.getElementById('promptInput');
+  const prefixSelect = document.getElementById('prefixPrompt');
+  const suffixSelect = document.getElementById('suffixPrompt');
+  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+
+  try {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+    const imageUrl = await websim.upload(file);
+
+    const promptHistory = EDITOR_STATE.currentImage.dataset.galleryId ? 
+      galleryImages.find(img => img.id === EDITOR_STATE.currentImage.dataset.galleryId)?.promptHistory : [];
+
+    const newEntry = await room.collection('gallery_images').create({
+      prompt: fullPrompt,
+      title: fullPrompt,
+      imageUrl: imageUrl,
+      views: 0,
+      uses: 0,
+      modified: true,
+      promptHistory: [
+        ...promptHistory,
+        {
+          prompt: fullPrompt,
+          timestamp: new Date().toISOString(),
+          username: room.party.client.username
+        }
+      ],
+      sourceImageId: EDITOR_STATE.currentImage.dataset.galleryId || null
+    });
+
+    EDITOR_STATE.currentImage.src = imageUrl;
+    EDITOR_STATE.currentImage.dataset.galleryId = newEntry.id;
+    alert('Image added to gallery successfully!');
+    renderGallery();
+  } catch (error) {
+    console.error('Error adding to gallery:', error);
+    alert('Failed to add image to gallery. Please try again.');
+  }
+}
+
+// Setup editor controls
+function setupEditorControls() {
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+  const editorControls = document.getElementById('editorControls');
+  const fillImagePrompt = document.getElementById('fillImagePrompt');
+  const loadingSpinner = document.getElementById('loadingSpinner');
+  const placeholderText = document.getElementById('placeholderText');
+  loadingSpinner.style.display = 'none';
+  placeholderText.style.display = 'none';
+  if (EDITOR_STATE.currentImage) {
+    canvas.width = EDITOR_STATE.currentImage.naturalWidth;
+    canvas.height = EDITOR_STATE.currentImage.naturalHeight;
+    ctx.drawImage(EDITOR_STATE.currentImage, 0, 0);
+    EDITOR_STATE.originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    EDITOR_STATE.currentImage.style.display = 'none';
+    canvas.style.display = 'block';
+    editorControls.style.display = 'flex';
+  } else {
+    canvas.style.display = 'none';
+    editorControls.style.display = 'flex';
+  }
+  fillImagePrompt.style.display = 'none';
+  if (!canvas.hasEventListener) {
+    canvas.addEventListener('click', handleCanvasClick);
+    canvas.hasEventListener = true;
+  }
+}
+
+// Setup image editor
 function setupImageEditor() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
@@ -88,6 +228,7 @@ function setupImageEditor() {
   }
 }
 
+// Handle canvas click
 function handleCanvasClick(e) {
   const canvas = document.getElementById('editCanvas');
   const rect = canvas.getBoundingClientRect();
@@ -119,6 +260,7 @@ function handleCanvasClick(e) {
   drawSelectionOverlay();
 }
 
+// Magic wand select
 function magicWandSelect(imageData, startX, startY, tolerance) {
   const width = imageData.width;
   const height = imageData.height;
@@ -150,6 +292,7 @@ function magicWandSelect(imageData, startX, startY, tolerance) {
   return selected;
 }
 
+// Draw selection overlay
 function drawSelectionOverlay() {
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
@@ -175,6 +318,7 @@ function drawSelectionOverlay() {
   }
 }
 
+// Handle text tool
 function handleTextTool(clientX, clientY, canvasX, canvasY) {
   const textControls = document.getElementById('textControls');
   const canvas = document.getElementById('editCanvas');
@@ -226,6 +370,7 @@ function handleTextTool(clientX, clientY, canvasX, canvasY) {
   updateTextPreview();
 }
 
+// Update text preview
 function updateTextPreview() {
   if (!EDITOR_STATE.textPreview || !EDITOR_STATE.currentTextPosition) return;
   
@@ -241,10 +386,57 @@ function updateTextPreview() {
   EDITOR_STATE.textPreview.textContent = text || 'Enter text...';
 }
 
-window.addEventListener('load', async () => {
-  await initGallery();
-  setupImageEditor();
-});
+// Initialize gallery
+async function initGallery() {
+  const galleryImagesList = await room.collection('gallery_images').getList();
+  galleryImages = galleryImagesList;
+  room.collection('gallery_images').subscribe(images => {
+    renderGallery(images);
+  });
+  renderGallery(galleryImagesList);
+}
+
+// Render gallery
+function renderGallery(galleryImages) {
+  const galleryEl = document.getElementById('gallery');
+  let images = [...galleryImages];
+  
+  images = images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  
+  const start = 0;
+  const end = 10;
+  const paginatedImages = images.slice(start, end);
+  
+  if (paginatedImages.length === 0) {
+    galleryEl.innerHTML = `
+      <div class="no-results">
+        No images available
+      </div>
+    `;
+    return;
+  }
+  
+  galleryEl.innerHTML = paginatedImages.map(img => `
+    <div class="gallery-item">
+      <div 
+        class="gallery-item-image" 
+        style="background-image: url('${img.imageUrl}')"
+        onclick="loadGalleryImage('${img.id}')"
+        role="img" 
+        aria-label="${img.prompt}"
+      ></div>
+      <div class="metadata">
+        <div>${img.prompt}</div>
+        <div>by ${img.username}</div>
+        <div>${new Date(img.created_at).toLocaleDateString()}</div>
+      </div>
+      <div class="stats">
+        <span>${img.views || 0} views</span>
+        <span>${img.uses || 0} uses</span>
+      </div>
+    </div>
+  `).join('');
+}
 
 document.getElementById('promptInput').addEventListener('keypress', function (e) {
   if (e.key === 'Enter') {
@@ -274,51 +466,3 @@ document.addEventListener('keyup', function (e) {
   if (!e.shiftKey) EDITOR_STATE.isShiftPressed = false;
   if (!e.ctrlKey) EDITOR_STATE.isCtrlPressed = false;
 });
-
-function generateImage() {
-  const prefixSelect = document.getElementById('prefixPrompt');
-  const promptInput = document.getElementById('promptInput');
-  const suffixSelect = document.getElementById('suffixPrompt');
-  const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
-  const imageContainer = document.getElementById('imageContainer');
-  const loadingSpinner = document.getElementById('loadingSpinner');
-  const placeholderText = document.getElementById('placeholderText');
-  const saveButton = document.getElementById('saveButton');
-  const editorControls = document.getElementById('editorControls');
-  const addGalleryButton = document.getElementById('addGalleryButton');
-
-  if (!promptInput.value.trim()) {
-    alert('Please enter a prompt!');
-    return;
-  }
-
-  loadingSpinner.style.display = 'block';
-  placeholderText.style.display = 'none';
-  saveButton.style.display = 'none';
-  addGalleryButton.style.display = 'none';
-
-  const existingImages = imageContainer.querySelectorAll('img');
-  existingImages.forEach(img => img.remove());
-
-  const generatedImage = document.createElement('img');
-  generatedImage.id = `generatedImage_${Date.now()}`;
-  generatedImage.className = 'generated-image';
-  generatedImage.style.display = 'none';
-  generatedImage.crossOrigin = 'anonymous';
-  
-  generatedImage.src = fullPrompt;
-  generatedImage.alt = fullPrompt;
-
-  generatedImage.onload = async function() {
-    loadingSpinner.style.display = 'none';
-    generatedImage.style.display = 'block';
-    placeholderText.style.display = 'none';
-    saveButton.style.display = 'block';
-    addGalleryButton.style.display = 'block';
-    EDITOR_STATE.currentImage = generatedImage;
-    setupImageEditor();
-  };
-
-  imageContainer.appendChild(generatedImage);
-}

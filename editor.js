@@ -254,55 +254,64 @@ function updateTextPreview() {
 
 async function commitText() {
   if (!EDITOR_STATE.currentTextPosition || !EDITOR_STATE.currentImage) return;
+
   const canvas = document.getElementById('editCanvas');
   const ctx = canvas.getContext('2d');
   const text = document.getElementById('textInput').value;
+
   if (!text.trim()) {
     cancelText();
     return;
   }
+
   ctx.save();
+
   const fontFamily = document.getElementById('fontFamily').value;
   const fontSize = document.getElementById('fontSize').value;
   const color = document.getElementById('textColor').value;
+
   const scaledFontSize = fontSize * EDITOR_STATE.currentTextPosition.scaleX;
   ctx.font = `${scaledFontSize}px ${fontFamily}`;
   ctx.fillStyle = color;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';  
+
   ctx.fillText(text, EDITOR_STATE.currentTextPosition.x, EDITOR_STATE.currentTextPosition.y);
   ctx.restore();
+
   EDITOR_STATE.originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  // If this is a newly generated image, get its ID from the dataset
+
   let sourceImage;
   if (EDITOR_STATE.currentImage.dataset.galleryId) {
     sourceImage = galleryImages.find(img => img.id === EDITOR_STATE.currentImage.dataset.galleryId);
   } else {
-    // Otherwise find by URL for existing gallery images
     sourceImage = galleryImages.find(img => img.imageUrl === EDITOR_STATE.currentImage.src);
   }
+
   if (sourceImage) {
     try {
       await room.collection('gallery_images').update(sourceImage.id, {
         uses: (sourceImage.uses || 0) + 1
       });
-      const basePromptHistory = galleryImages.find(img => 
-        img.imageUrl === EDITOR_STATE.currentImage.src
-      )?.promptHistory || [{
+
+      const basePromptHistory = sourceImage.promptHistory || [{
         prompt: sourceImage.prompt,
         timestamp: sourceImage.created_at,
         username: sourceImage.username
       }];
+
       const promptHistory = [...basePromptHistory];
       promptHistory.push({
-        prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
+        prompt: `Text edit: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
         timestamp: new Date().toISOString(),
         type: 'text-edit',
         username: room.party.client.username
       });
+
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       const file = new File([blob], 'edited-image.png', { type: 'image/png' });
       const imageUrl = await websim.upload(file);
+
       const newEntry = await room.collection('gallery_images').create({
         prompt: sourceImage.prompt,
         title: sourceImage.title || sourceImage.prompt,
@@ -313,6 +322,7 @@ async function commitText() {
         promptHistory: promptHistory,
         sourceImageId: sourceImage.id
       });
+
       EDITOR_STATE.currentImage.src = imageUrl;
       EDITOR_STATE.currentImage.dataset.galleryId = newEntry.id;
     } catch (error) {
@@ -320,6 +330,7 @@ async function commitText() {
       alert('Failed to save text edit. Please try again.');
     }
   }
+
   cancelText();
 }
 

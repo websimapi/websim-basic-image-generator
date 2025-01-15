@@ -551,6 +551,7 @@
   <div class="container">
     <h1>AI Image Editor</h1>
     
+    <!-- Editor Section -->
     <div class="editor-section">
       <div class="input-group">
         <select id="prefixPrompt">
@@ -588,7 +589,7 @@
       </div>
 
       <div class="editor-controls" id="editorControls" style="display: none;">
-        <!-- Editor controls -->
+        <!-- Editor controls will be dynamically loaded here -->
       </div>
 
       <div class="action-buttons">
@@ -597,7 +598,7 @@
       </div>
     </div>
 
-    <!-- Text controls -->
+    <!-- Text Controls -->
     <div id="textControls" class="text-controls" style="display: none;">
       <input type="text" id="textInput" placeholder="Enter text...">
       <div class="text-options">
@@ -615,7 +616,7 @@
       </div>
     </div>
 
-    <!-- Gallery -->
+    <!-- Gallery Section -->
     <div class="gallery-container">
       <div class="gallery-header">
         <div class="gallery-tabs">
@@ -643,7 +644,7 @@
     </div>
 
     <!-- Edit Title Dialog -->
-    <div id="editTitleDialog" style="display: none;">
+    <div id="editTitleDialog" class="dialog" style="display: none;">
       <div class="dialog-content">
         <h3>Edit Image Title</h3>
         <input type="text" id="editTitleInput" placeholder="Enter new title">
@@ -654,15 +655,27 @@
       </div>
     </div>
 
+    <!-- Edit Prompt Dialog -->
+    <div id="editPromptDialog" class="dialog" style="display: none;">
+      <div class="dialog-content">
+        <h3>Edit Image Prompt</h3>
+        <input type="text" id="editPromptInput" placeholder="Enter new prompt">
+        <div class="dialog-buttons">
+          <button onclick="cancelEdit()">Cancel</button>
+          <button onclick="saveEdit()">Save</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Overlay -->
     <div id="overlay" style="display: none;"></div>
-
   </div>
 
-  <!-- Including external scripts -->
+  <!-- Include Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/websimsocket@latest/dist/websimsocket.min.js"></script>
   <script src="utils.js"></script>
   <script src="gallery.js"></script>
+  <script src="imageEditor.js"></script>
   <script src="editor.js"></script>
   <script src="app.js"></script>
   <script>

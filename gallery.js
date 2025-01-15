@@ -22,7 +22,8 @@ async function initGallery() {
 function renderGallery() {
   const galleryEl = document.getElementById('gallery');
   let images = [...galleryImages];
-  
+
+  // Filter images based on user selections
   if (currentUserFilter) {
     images = images.filter(img => {
       const isCreator = img.username === currentUserFilter;
@@ -34,6 +35,7 @@ function renderGallery() {
   } else if (currentSearch) {
     const searchLower = currentSearch.toLowerCase();
     images = images.filter(img => 
+      img.title.toLowerCase().includes(searchLower) || 
       img.prompt.toLowerCase().includes(searchLower) || 
       img.username.toLowerCase().includes(searchLower)
     );
@@ -46,6 +48,7 @@ function renderGallery() {
     document.getElementById('userFilterInfo').style.display = 'none';
   }
 
+  // Sort images based on current tab
   switch (currentTab) {
     case 'popular':
       images.sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -64,6 +67,7 @@ function renderGallery() {
       images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
+  // Pagination
   const start = (currentPage - 1) * itemsPerPage;
   const end = start + itemsPerPage;
   const paginatedImages = images.slice(start, end);
@@ -80,13 +84,15 @@ function renderGallery() {
     return;
   }
 
+  // Render images
   galleryEl.innerHTML = paginatedImages.map(img => createGalleryItemHTML(img)).join('');
-  
+
   document.getElementById('prevPage').disabled = currentPage === 1;
   document.getElementById('nextPage').disabled = currentPage === Math.ceil(images.length / itemsPerPage);
   document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(images.length / itemsPerPage)}`;
 }
 
+// Create gallery item HTML
 function createGalleryItemHTML(img) {
   return `
     <div class="gallery-item">
@@ -116,15 +122,15 @@ function createGalleryItemHTML(img) {
       ${img.username === room.party.client.username ? `
         <div class="gallery-item-controls">
           <button class="edit-button" onclick="editImage('${img.id}')" title="Edit Image">
-            <!-- SVG icon for edit -->
+            <!-- Custom SVG icon for edit -->
             <svg viewBox="0 0 24 24">
-              <path d="M5,17.59V21h3.41l9.83-9.83-3.41-3.41L5,17.59zM20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34c-0.39-0.39-1.02-0.39-1.41,0L15.13,3.96l3.41,3.41L20.71,7.04z"/>
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm16.71-13.04a1.004 1.004 0 0 0-1.42 0l-2.34 2.34 3.75 3.75 2.34-2.34a1.004 1.004 0 0 0 0-1.42l-2.33-2.33z"/>
             </svg>
           </button>
           <button class="delete-button" onclick="deleteImage('${img.id}')" title="Delete Image">
-            <!-- SVG icon for delete -->
+            <!-- Custom SVG icon for delete -->
             <svg viewBox="0 0 24 24">
-              <path d="M16,9v10H8V9h8m-1.5-6h-5l-1,1H5v2h14V4h-4.5l-1-1z"/>
+              <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"/>
             </svg>
           </button>
         </div>
@@ -133,15 +139,16 @@ function createGalleryItemHTML(img) {
   `;
 }
 
-// Gallery item interaction handlers
+// Load gallery image into editor
 async function loadGalleryImage(id) {
   const image = galleryImages.find(img => img.id === id);
   if (!image) return;
-  
+
   updateImageStats(id, image);
   loadImageIntoEditor(image);
 }
 
+// Update image stats
 async function updateImageStats(id, image) {
   await room.collection('gallery_images').update(id, {
     views: (image.views || 0) + 1,
