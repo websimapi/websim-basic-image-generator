@@ -778,33 +778,29 @@
         });
         
         room.collection('follows').subscribe(follows => {
-          currentlyFollowing = new Set(follows
+          const newFollowing = new Set(follows
             .filter(f => f.follower === room.party.client.username)
             .map(f => f.following)
           );
-          updateFollowButton();
-          if (currentTab === 'following') {
-            renderGallery();
+          
+          if (!setsEqual(currentlyFollowing, newFollowing)) {
+            currentlyFollowing = newFollowing;
+            updateFollowButton();
+            if (currentTab === 'following') {
+              renderGallery();
+            }
           }
         });
         
         renderGallery();
       }
 
-      function updateFollowButton() {
-        const followButton = document.getElementById('followButton');
-        if (!currentUserFilter || currentUserFilter === room.party.client.username) {
-          followButton.style.display = 'none';
-          return;
+      function setsEqual(set1, set2) {
+        if (set1.size !== set2.size) return false;
+        for (const item of set1) {
+          if (!set2.has(item)) return false;
         }
-        
-        followButton.style.display = 'block';
-        const isFollowing = currentlyFollowing.has(currentUserFilter);
-        followButton.className = isFollowing ? 'follow-button following' : 'follow-button';
-        followButton.innerHTML = `
-          <span class="follow-text">Follow</span>
-          <span class="unfollow-text">Unfollow</span>
-        `;
+        return true;
       }
 
       async function toggleFollow() {
@@ -817,24 +813,31 @@
           }).getList();
           
           if (follows.length > 0) {
-            await room.collection('follows').delete(follows[0].id);
-            currentlyFollowing.delete(currentUserFilter);
+            await Promise.all(follows.map(follow => 
+              room.collection('follows').delete(follow.id)
+            ));
           } else {
             await room.collection('follows').create({
               follower: room.party.client.username,
               following: currentUserFilter
             });
-            currentlyFollowing.add(currentUserFilter);
-          }
-          
-          updateFollowButton();
-          if (currentTab === 'following') {
-            renderGallery();
           }
         } catch (error) {
           console.error('Error toggling follow:', error);
           alert('Failed to update follow status. Please try again.');
         }
+      }
+
+      function updateFollowButton() {
+        const followButton = document.getElementById('followButton');
+        if (!currentUserFilter || currentUserFilter === room.party.client.username) {
+          followButton.style.display = 'none';
+          return;
+        }
+        
+        followButton.style.display = 'block';
+        const isFollowing = currentlyFollowing.has(currentUserFilter);
+        followButton.className = isFollowing ? 'follow-button following' : 'follow-button';
       }
 
       function renderGallery() {
@@ -1704,23 +1707,18 @@
         const filterInfo = document.getElementById('userFilterInfo');
         if (show) {
           filterInfo.style.display = 'flex';
-          document.getElementById('userFilterName').textContent = currentUserFilter;
+          const isFollowing = currentlyFollowing.has(currentUserFilter);
           
-          const followButtonHtml = `
-            <button id="followButton" onclick="toggleFollow()" class="follow-button">
-              <span class="follow-text">Follow</span>
-              <span class="unfollow-text">Unfollow</span>
-            </button>
-          `;
-          
-          // Update the userFilterInfo content
           filterInfo.innerHTML = `
             <span>Showing images by: <strong id="userFilterName">${currentUserFilter}</strong></span>
-            ${followButtonHtml}
+            ${currentUserFilter !== room.party.client.username ? `
+              <button id="followButton" onclick="toggleFollow()" class="follow-button${isFollowing ? ' following' : ''}">
+                <span class="follow-text">Follow</span>
+                <span class="unfollow-text">Unfollow</span>
+              </button>
+            ` : ''}
             <button onclick="clearUserFilter()" class="clear-filter-button">Clear Filter</button>
           `;
-          
-          updateFollowButton();
         } else {
           filterInfo.style.display = 'none';
         }
