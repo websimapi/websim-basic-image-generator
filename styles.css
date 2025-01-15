@@ -377,6 +377,17 @@ select option {
 }
 
 /* Following UI Styles */
+#userFilterInfo {
+  background: rgba(255,255,255,0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .follow-button {
   background: #2196F3;
   padding: 4px 12px;
@@ -386,11 +397,12 @@ select option {
   color: white;
   cursor: pointer;
   transition: background 0.2s;
-  margin-left: 8px;
+  min-width: auto;
 }
 
 .follow-button:hover {
   background: #1976D2;
+  transform: translateY(-1px);
 }
 
 .follow-button.following {
@@ -399,6 +411,10 @@ select option {
 
 .follow-button.following:hover {
   background: #f44336;
+}
+
+#userFilterFollowButton {
+  margin-left: auto;
 }
 
 .following-list {

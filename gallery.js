@@ -392,14 +392,35 @@ function updateUserFilterUI(show) {
   if (show) {
     filterInfo.style.display = 'flex';
     document.getElementById('userFilterName').textContent = state.currentUserFilter;
+    
+    // Handle follow button visibility/state
+    const followButtonContainer = document.getElementById('userFilterFollowButton');
+    if (state.currentUserFilter === room.party.client.username) {
+      followButtonContainer.style.display = 'none';
+    } else {
+      followButtonContainer.style.display = 'block';
+      const isFollowing = state.following.has(state.currentUserFilter);
+      followButtonContainer.innerHTML = `
+        <button 
+          class="follow-button ${isFollowing ? 'following' : ''}" 
+          onclick="toggleFollow('${state.currentUserFilter}')"
+        >
+          ${isFollowing ? 'Following' : 'Follow'}
+        </button>
+      `;
+    }
   } else {
     filterInfo.style.display = 'none';
   }
 }
 
 function showUserGallery(username) {
-  state.currentUserFilter = username;
-  state.currentPage = 1; // Reset to first page when filtering
-  state.currentTab = 'recent'; // Reset to recent tab
-  renderGallery();
+  if (username === room.party.client.username) {
+    state.currentTab = 'my';
+  } else {
+    state.currentUserFilter = username;
+    state.currentPage = 1; // Reset to first page
+    state.currentTab = 'recent'; // Reset to recent tab when viewing specific user
+  }
+  renderGallery(); 
 }
