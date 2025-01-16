@@ -1,0 +1,107 @@
+/* Editor specific styles */
+.editor-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+
+.image-container {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.editor-controls {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tool-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background: rgba(255,255,255,0.05);
+  padding: 8px;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.tool-button {
+  padding: 0.6rem;
+  background: #2196F3;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.text-controls {
+  position: fixed;
+  background: rgba(0,0,0,0.8);
+  padding: 12px;
+  border-radius: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  margin-top: 30px;
+  max-width: 300px;
+}
+
+.text-preview {
+  position: fixed;
+  pointer-events: none;
+  white-space: nowrap;
+  transform-origin: left top;
+  z-index: 1001;
+}
+
+.color-display {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 5px;
+  margin-left: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+}
+
+.color-preview {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-right: 8px;
+}
+
+.color-value {
+  color: white;
+  font-family: monospace;
+}
