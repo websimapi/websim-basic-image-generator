@@ -718,9 +718,6 @@
     let currentTextPosition = null;
     let textPreview = null;
     let currentUserFilter = null;
-    let touchTimeout = null;
-    let isTouchSelecting = false;
-    const LONG_PRESS_DURATION = 500; // 500ms for long press
 
     async function initGallery() {
       galleryImages = await room.collection('gallery_images').getList();
@@ -914,84 +911,21 @@
     function handleCanvasClick(e) {
       const canvas = document.getElementById('editCanvas');
       const rect = canvas.getBoundingClientRect();
-      const coordinates = {
-        x: (e.clientX - rect.left) * (canvas.width / rect.width),
-        y: (e.clientY - rect.top) * (canvas.height / rect.height)
-      };
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
       const activeTool = document.querySelector('.tool-button.active');
       if (activeTool && activeTool.id === 'textTool') {
-        handleTextTool(e.clientX, e.clientY, coordinates.x, coordinates.y);
+        handleTextTool(e.clientX, e.clientY, x, y);
         return;
       }
 
-      handleSelectionTool(coordinates, canvas);
-    }
-
-    function setupTouchHandlers() {
-      const canvas = document.getElementById('editCanvas');
-      
-      canvas.addEventListener('touchstart', handleTouchStart);
-      canvas.addEventListener('touchend', handleTouchEnd);
-      canvas.addEventListener('touchmove', handleTouchMove);
-      
-      // Prevent default touch behaviors
-      canvas.addEventListener('touchstart', (e) => e.preventDefault());
-      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    }
-
-    function handleTouchStart(e) {
-      const activeTool = document.querySelector('.tool-button.active');
-      if (activeTool?.id !== 'magicWandTool') return;
-
-      // Start timer for long press
-      touchTimeout = setTimeout(() => {
-        isTouchSelecting = true;
-        // Vibrate device if supported (100ms)
-        if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
-      }, LONG_PRESS_DURATION);
-
-      // Simulate click for the first touch
-      const touch = e.touches[0];
-      const canvas = e.target;
-      const rect = canvas.getBoundingClientRect();
-      const coordinates = {
-        x: (touch.clientX - rect.left) * (canvas.width / rect.width),
-        y: (touch.clientY - rect.top) * (canvas.height / rect.height)
-      };
-
-      // If not already in multi-select mode, clear previous selection
-      if (!isTouchSelecting) {
+      if (!isShiftPressed && !isCtrlPressed) {
         currentSelection = null;
       }
-
-      handleSelectionTool(coordinates, canvas, isTouchSelecting);
-    }
-
-    function handleTouchMove(e) {
-      // Clear long press timer if finger moves
-      if (touchTimeout) {
-        clearTimeout(touchTimeout);
-        touchTimeout = null;
-      }
-    }
-
-    function handleTouchEnd() {
-      // Clear long press timer
-      if (touchTimeout) {
-        clearTimeout(touchTimeout);
-        touchTimeout = null;
-      }
-    }
-
-    function handleSelectionTool(coordinates, canvas, isMultiSelect = false) {
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const newSelection = magicWandSelect(imageData, Math.round(coordinates.x), Math.round(coordinates.y), 32);
-
-      if (isMultiSelect || isShiftPressed || isCtrlPressed) {
+      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      const newSelection = magicWandSelect(imageData, Math.round(x), Math.round(y), 32);
+      if (isShiftPressed || isCtrlPressed) {
         if (currentSelection) {
           for (let i = 0; i < currentSelection.length; i++) {
             currentSelection[i] = currentSelection[i] || newSelection[i];
@@ -1002,32 +936,7 @@
       } else {
         currentSelection = newSelection;
       }
-
-      drawSelectionOverlay(canvas);
-    }
-
-    function drawSelectionOverlay(canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.putImageData(originalImageData, 0, 0);
-      if (!currentSelection) return;
-      const width = canvas.width;
-      const height = canvas.height;
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const pos = y * width + x;
-          if (currentSelection[pos]) {
-            const isEdge = x > 0 && !currentSelection[pos - 1] || x < width - 1 && !currentSelection[pos + 1] || y > 0 && !currentSelection[pos - width] || y < height - 1 && !currentSelection[pos + width];
-            if (isEdge) {
-              ctx.fillStyle = 'white';
-              ctx.fillRect(x - 1, y - 1, 3, 3);
-              ctx.strokeStyle = 'black';
-              ctx.strokeRect(x - 1, y - 1, 3, 3);
-            }
-          }
-        }
-      }
+      drawSelectionOverlay();
     }
 
     function magicWandSelect(imageData, startX, startY, tolerance) {
@@ -1059,6 +968,31 @@
         }
       }
       return selected;
+    }
+
+    function drawSelectionOverlay() {
+      const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.putImageData(originalImageData, 0, 0);
+      if (!currentSelection) return;
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const pos = y * width + x;
+          if (currentSelection[pos]) {
+            const isEdge = x > 0 && !currentSelection[pos - 1] || x < width - 1 && !currentSelection[pos + 1] || y > 0 && !currentSelection[pos - width] || y < height - 1 && !currentSelection[pos + width];
+            if (isEdge) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(x - 1, y - 1, 3, 3);
+              ctx.strokeStyle = 'black';
+              ctx.strokeRect(x - 1, y - 1, 3, 3);
+            }
+          }
+        }
+      }
     }
 
     function setTool(tool) {
@@ -1158,307 +1092,79 @@
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
       
       try {
-        const sourceImage = galleryImages.find(img => 
-          img.imageUrl === currentImage.src
-        );
-        
-        if (sourceImage) {
-          await room.collection('gallery_images').update(sourceImage.id, {
-            views: (sourceImage.views || 0) + 1,
-            uses: (sourceImage.uses || 0) + 1
-          });
-        }
-        
-        const promptHistory = sourceImage ? 
-          [...(sourceImage.promptHistory || [{
-            prompt: sourceImage.prompt,
-            timestamp: sourceImage.created_at,
-            username: sourceImage.username
-          }])] : [];
-        
-        promptHistory.push({
+        // Use the new WebSim LLM-based image generation API
+        const result = await websim.imageGen({
           prompt: fullPrompt,
-          timestamp: new Date().toISOString(),
-          username: room.party.client.username
+          aspect_ratio: "1:1"
         });
         
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-        const imageUrl = await websim.upload(file);
+        // Create new image element with the generated image URL
+        const generatedImage = document.createElement('img');
+        generatedImage.id = `generatedImage_${Date.now()}`;
+        generatedImage.className = 'generated-image';
+        generatedImage.style.display = 'none';
+        generatedImage.crossOrigin = 'anonymous';
+        generatedImage.src = result.url;
+        generatedImage.alt = fullPrompt;
         
-        await room.collection('gallery_images').create({
-          prompt: fullPrompt,
-          title: fullPrompt,
-          imageUrl: imageUrl,
-          views: 0,
-          uses: 0,
-          modified: true,
-          promptHistory: promptHistory,
-          sourceImageId: sourceImage?.id
-        });
+        // Set a flag to track if this is a fresh generation
+        generatedImage.dataset.freshGeneration = 'true';
         
-        alert('Image added to gallery successfully!');
-        
-      } catch (error) {
-        console.error('Error adding to gallery:', error);
-        alert('Failed to add image to gallery. Please try again.');
-      }
-    }
-
-    function generateImage() {
-      const prefixSelect = document.getElementById('prefixPrompt');
-      const promptInput = document.getElementById('promptInput');
-      const suffixSelect = document.getElementById('suffixPrompt');
-      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-
-      const imageContainer = document.getElementById('imageContainer');
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      const saveButton = document.getElementById('saveButton');
-      const addGalleryButton = document.getElementById('addGalleryButton');
-
-      if (!promptInput.value.trim()) {
-        alert('Please enter a prompt!');
-        return;
-      }
-
-      loadingSpinner.style.display = 'block';
-      placeholderText.style.display = 'none';
-      saveButton.style.display = 'none';
-      addGalleryButton.style.display = 'none';
-
-      const existingImages = imageContainer.querySelectorAll('img');
-      existingImages.forEach(img => img.remove());
-
-      const generatedImage = document.createElement('img');
-      generatedImage.id = `generatedImage_${Date.now()}`;
-      generatedImage.className = 'generated-image';
-      generatedImage.style.display = 'none';
-      generatedImage.crossOrigin = 'anonymous';
-      
-      // Set a flag to track if this is a fresh generation
-      generatedImage.dataset.freshGeneration = 'true';
-      
-      generatedImage.src = fullPrompt;
-      generatedImage.alt = fullPrompt;
-
-      generatedImage.onload = async function() {
-        // Check if this is a fresh generation and hasn't been processed yet
-        if (generatedImage.dataset.freshGeneration === 'true') {
-          // Immediately mark as processed to prevent duplicate processing
-          generatedImage.dataset.freshGeneration = 'false';
-          
-          loadingSpinner.style.display = 'none';
-          generatedImage.style.display = 'block';
-          placeholderText.style.display = 'none';
-          saveButton.style.display = 'block';
-          addGalleryButton.style.display = 'block';
-          currentImage = generatedImage;
-          
-          try {
-            // Create new gallery entry for the generated image
-            const galleryEntry = await room.collection('gallery_images').create({
-              prompt: fullPrompt,
-              imageUrl: generatedImage.src, 
-              views: 0,
-              uses: 0,
-              promptHistory: [{
+        generatedImage.onload = async function() {
+          // Check if this is a fresh generation and hasn't been processed yet
+          if (generatedImage.dataset.freshGeneration === 'true') {
+            // Immediately mark as processed to prevent duplicate processing
+            generatedImage.dataset.freshGeneration = 'false';
+            
+            const imageContainer = document.getElementById('imageContainer');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const placeholderText = document.getElementById('placeholderText');
+            const saveButton = document.getElementById('saveButton');
+            const addGalleryButton = document.getElementById('addGalleryButton');
+            const editorControls = document.getElementById('editorControls');
+            
+            loadingSpinner.style.display = 'none';
+            placeholderText.style.display = 'none';
+            saveButton.style.display = 'block';
+            addGalleryButton.style.display = 'block';
+            currentImage = generatedImage;
+            
+            try {
+              // Create new gallery entry for the generated image
+              const galleryEntry = await room.collection('gallery_images').create({
                 prompt: fullPrompt,
-                timestamp: new Date().toISOString(),
-                username: room.party.client.username
-              }]
-            });
-            
-            // Store the gallery entry ID on the image element
-            generatedImage.dataset.galleryId = galleryEntry.id;
-            
-            setupImageEditor();
-            
-          } catch (error) {
-            console.error('Error processing generated image:', error);
-            alert('Failed to process generated image. Please try again.');
+                imageUrl: result.url, 
+                views: 0,
+                uses: 0,
+                promptHistory: [{
+                  prompt: fullPrompt,
+                  timestamp: new Date().toISOString(),
+                  username: room.party.client.username
+                }]
+              });
+              
+              // Store the gallery entry ID on the image element
+              generatedImage.dataset.galleryId = galleryEntry.id;
+              
+              setupImageEditor();
+              
+            } catch (error) {
+              console.error('Error processing generated image:', error);
+              alert('Failed to process generated image. Please try again.');
+            }
           }
-        }
-      };
-
-      imageContainer.appendChild(generatedImage);
-    }
-
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-      }
-      
-      const imageContainer = document.getElementById('imageContainer');
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      const saveButton = document.getElementById('saveButton');
-      const addGalleryButton = document.getElementById('addGalleryButton');
-      
-      loadingSpinner.style.display = 'block';
-      placeholderText.style.display = 'none';
-      saveButton.style.display = 'none';
-      addGalleryButton.style.display = 'none';
-      
-      try {
-        // Upload to blob storage
-        const imageUrl = await websim.upload(file);
-        
-        // Clear existing images
-        const existingImages = imageContainer.querySelectorAll('img');
-        existingImages.forEach(img => img.remove());
-        
-        // Create new image element
-        const uploadedImage = document.createElement('img');
-        uploadedImage.id = `generatedImage_${Date.now()}`;
-        uploadedImage.className = 'generated-image';
-        uploadedImage.style.display = 'none';
-        uploadedImage.crossOrigin = 'anonymous';
-        uploadedImage.src = imageUrl;
-        uploadedImage.alt = file.name;
-        
-        uploadedImage.onload = function() {
-          loadingSpinner.style.display = 'none';
-          uploadedImage.style.display = 'block';
-          saveButton.style.display = 'block';
-          addGalleryButton.style.display = 'block';
-          currentImage = uploadedImage;
-          
-          setupImageEditor();
         };
-        
-        imageContainer.appendChild(uploadedImage);
-        
-        // Create initial gallery entry for uploaded image
-        const galleryEntry = await room.collection('gallery_images').create({
-          prompt: file.name,
-          title: file.name,
-          imageUrl: imageUrl,
-          views: 0,
-          uses: 0,
-          promptHistory: [{
-            prompt: `Uploaded image: ${file.name}`,
-            timestamp: new Date().toISOString(),
-            type: 'upload',
-            username: room.party.client.username
-          }]
-        });
-        
-        // Store the gallery entry ID on the image element
-        uploadedImage.dataset.galleryId = galleryEntry.id;
-        
-        // Reset the file input for future uploads
-        event.target.value = '';
-        
+
+        const imageContainer = document.getElementById('imageContainer');
+        imageContainer.appendChild(generatedImage);
       } catch (error) {
-        console.error('Error uploading image:', error);
+        console.error('Image generation failed:', error);
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const placeholderText = document.getElementById('placeholderText');
         loadingSpinner.style.display = 'none';
         placeholderText.style.display = 'block';
-        alert('Failed to upload image. Please try again.');
-        
-        // Reset the file input on error
-        event.target.value = '';
+        alert('Failed to generate image. Please try again.');
       }
-    }
-
-    async function commitText() {
-      if (!currentTextPosition || !currentImage) return;
-      
-      const canvas = document.getElementById('editCanvas');
-      const ctx = canvas.getContext('2d');
-      const text = document.getElementById('textInput').value;
-      
-      if (!text.trim()) {
-        cancelText();
-        return;
-      }
-      
-      ctx.save();
-      
-      const fontFamily = document.getElementById('fontFamily').value;
-      const fontSize = document.getElementById('fontSize').value;
-      const color = document.getElementById('textColor').value;
-      
-      // Scale the font size based on the canvas scaling
-      const scaledFontSize = fontSize * currentTextPosition.scaleX;
-      ctx.font = `${scaledFontSize}px ${fontFamily}`;
-      ctx.fillStyle = color;
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'left';  
-  
-      ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
-      
-      ctx.restore();
-      
-      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      // If this is a newly generated image, get its ID from the dataset
-      let sourceImage;
-      if (currentImage.dataset.galleryId) {
-        sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
-      } else {
-        // Otherwise find by URL for existing gallery images
-        sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
-      }
-      
-      if (sourceImage) {
-        // Get the base prompt history - either from the current image or create new from source
-        const basePromptHistory = galleryImages.find(img => 
-          img.imageUrl === currentImage.src
-        )?.promptHistory || [{
-          prompt: sourceImage.prompt,
-          timestamp: sourceImage.created_at,
-          username: sourceImage.username
-        }];
-        
-        // Create a fresh copy to avoid reference issues
-        const promptHistory = [...basePromptHistory];
-        
-        // Add text modification entry
-        promptHistory.push({
-          prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
-          timestamp: new Date().toISOString(),
-          type: 'text-edit',
-          username: room.party.client.username
-        });
-        
-        try {
-          // Create new modified image entry
-          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-          const imageUrl = await websim.upload(file);
-          
-          const newEntry = await room.collection('gallery_images').create({
-            prompt: sourceImage.prompt,
-            title: sourceImage.title || sourceImage.prompt,
-            imageUrl: imageUrl,
-            views: 0,
-            uses: 0,
-            modified: true,
-            promptHistory: promptHistory,
-            sourceImageId: sourceImage.id
-          });
-
-          // Update usage count of source image
-          await room.collection('gallery_images').update(sourceImage.id, {
-            uses: (sourceImage.uses || 0) + 1
-          });
-
-          // Update the current image reference and its gallery ID
-          currentImage.src = imageUrl;
-          currentImage.dataset.galleryId = newEntry.id;
-          
-        } catch (error) {
-          console.error('Error saving text edit:', error);
-          alert('Failed to save text edit. Please try again.');
-        }
-      }
-      
-      cancelText();
     }
 
     async function generateSelectionFill() {
@@ -1477,139 +1183,150 @@
       const loadingSpinner = document.getElementById('loadingSpinner');
       loadingSpinner.style.display = 'block';
 
-      const generatedImage = document.createElement('img');
-      generatedImage.crossOrigin = 'anonymous';
-      generatedImage.style.display = 'none';
-      generatedImage.dataset.freshFill = 'true';
-      
-      generatedImage.src = fullPrompt;
-      generatedImage.alt = fullPrompt;
-
-      generatedImage.onload = async function() {
-        if (generatedImage.dataset.freshFill !== 'true') return;
-        generatedImage.dataset.freshFill = 'false';
+      try {
+        // Use the new WebSim LLM-based image generation API
+        const result = await websim.imageGen({
+          prompt: fullPrompt,
+          aspect_ratio: "1:1"
+        });
         
-        loadingSpinner.style.display = 'none';
-        
-        const canvas = document.getElementById('editCanvas');
-        const ctx = canvas.getContext('2d');
+        const generatedImage = document.createElement('img');
+        generatedImage.crossOrigin = 'anonymous';
+        generatedImage.style.display = 'none';
+        generatedImage.dataset.freshFill = 'true';
+        generatedImage.src = result.url;
+        generatedImage.alt = fullPrompt;
 
-        let minX = canvas.width;
-        let minY = canvas.height;
-        let maxX = 0;
-        let maxY = 0;
+        generatedImage.onload = async function() {
+          if (generatedImage.dataset.freshFill !== 'true') return;
+          generatedImage.dataset.freshFill = 'false';
+          
+          loadingSpinner.style.display = 'none';
+          
+          const canvas = document.getElementById('editCanvas');
+          const ctx = canvas.getContext('2d');
 
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              minX = Math.min(minX, x);
-              minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x);
-              maxY = Math.max(maxY, y);
+          let minX = canvas.width;
+          let minY = canvas.height;
+          let maxX = 0;
+          let maxY = 0;
+
+          for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+              const pos = y * canvas.width + x;
+              if (currentSelection[pos]) {
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+              }
             }
           }
-        }
 
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        const selectionWidth = maxX - minX + 1;
-        const selectionHeight = maxY - minY + 1;
-        
-        tempCanvas.width = selectionWidth;
-        tempCanvas.height = selectionHeight;
-        
-        tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
-        
-        const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
+          const tempCanvas = document.createElement('canvas');
+          const tempCtx = tempCanvas.getContext('2d');
+          const selectionWidth = maxX - minX + 1;
+          const selectionHeight = maxY - minY + 1;
+          
+          tempCanvas.width = selectionWidth;
+          tempCanvas.height = selectionHeight;
+          
+          tempCtx.drawImage(generatedImage, 0, 0, selectionWidth, selectionHeight);
+          
+          const scaledImageData = tempCtx.getImageData(0, 0, selectionWidth, selectionHeight);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const pixels = imageData.data;
 
-        for (let y = minY; y <= maxY; y++) {
-          for (let x = minX; x <= maxX; x++) {
-            const pos = y * canvas.width + x;
-            if (currentSelection[pos]) {
-              const scaledX = x - minX;
-              const scaledY = y - minY;
-              const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
-              const targetPos = pos * 4;
+          for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+              const pos = y * canvas.width + x;
+              if (currentSelection[pos]) {
+                const scaledX = x - minX;
+                const scaledY = y - minY;
+                const scaledPos = (scaledY * selectionWidth + scaledX) * 4;
+                const targetPos = pos * 4;
+                
+                pixels[targetPos] = scaledImageData.data[scaledPos];
+                pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
+                pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
+                pixels[targetPos + 3] = scaledImageData.data[scaledPos + 3];
+              }
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          originalImageData = imageData;
+
+          // If this is a newly generated image, get its ID from the dataset
+          let sourceImage;
+          if (currentImage.dataset.galleryId) {
+            sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
+          } else {
+            // Otherwise find by URL for existing gallery images
+            sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+          }
+          
+          if (sourceImage) {
+            try {
+              await room.collection('gallery_images').update(sourceImage.id, {
+                uses: (sourceImage.uses || 0) + 1
+              });
               
-              pixels[targetPos] = scaledImageData.data[scaledPos];
-              pixels[targetPos + 1] = scaledImageData.data[scaledPos + 1];
-              pixels[targetPos + 2] = scaledImageData.data[scaledPos + 2];
-              pixels[targetPos + 3] = scaledImageData.data[scaledPos + 3];
+              // Get the base prompt history - either from the current image or create new from source
+              const basePromptHistory = galleryImages.find(img => 
+                img.imageUrl === currentImage.src
+              )?.promptHistory || [{
+                prompt: sourceImage.prompt,
+                timestamp: sourceImage.created_at,
+                username: sourceImage.username
+              }];
+              
+              // Create a fresh copy to avoid reference issues
+              const promptHistory = [...basePromptHistory];
+              
+              promptHistory.push({
+                prompt: fullPrompt,
+                timestamp: new Date().toISOString(),
+                type: 'selection-fill',
+                username: room.party.client.username
+              });
+              
+              const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+              const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+              const imageUrl = await websim.upload(file);
+              
+              const newEntry = await room.collection('gallery_images').create({
+                prompt: fullPrompt,
+                title: fullPrompt,
+                imageUrl: imageUrl,
+                views: 0,
+                uses: 0,
+                modified: true,
+                promptHistory: promptHistory,
+                sourceImageId: sourceImage.id
+              });
+
+              // Update the current image reference and its gallery ID
+              currentImage.src = imageUrl;
+              currentImage.dataset.galleryId = newEntry.id;
+              
+            } catch (error) {
+              console.error('Error saving selection fill:', error);
+              alert('Failed to save selection fill. Please try again.');
             }
           }
-        }
+          
+          document.getElementById('fillImagePrompt').style.display = 'none';
+          generatedImage.remove();
+        };
 
-        ctx.putImageData(imageData, 0, 0);
-        originalImageData = imageData;
-
-        // If this is a newly generated image, get its ID from the dataset
-        let sourceImage;
-        if (currentImage.dataset.galleryId) {
-          sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
-        } else {
-          // Otherwise find by URL for existing gallery images
-          sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
-        }
-        
-        if (sourceImage) {
-          try {
-            await room.collection('gallery_images').update(sourceImage.id, {
-              uses: (sourceImage.uses || 0) + 1
-            });
-            
-            // Get the base prompt history - either from the current image or create new from source
-            const basePromptHistory = galleryImages.find(img => 
-              img.imageUrl === currentImage.src
-            )?.promptHistory || [{
-              prompt: sourceImage.prompt,
-              timestamp: sourceImage.created_at,
-              username: sourceImage.username
-            }];
-            
-            // Create a fresh copy to avoid reference issues
-            const promptHistory = [...basePromptHistory];
-            
-            promptHistory.push({
-              prompt: fullPrompt,
-              timestamp: new Date().toISOString(),
-              type: 'selection-fill',
-              username: room.party.client.username
-            });
-            
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            const file = new File([blob], 'edited-image.png', { type: 'image/png' });
-            const imageUrl = await websim.upload(file);
-            
-            const newEntry = await room.collection('gallery_images').create({
-              prompt: fullPrompt,
-              title: fullPrompt,
-              imageUrl: imageUrl,
-              views: 0,
-              uses: 0,
-              modified: true,
-              promptHistory: promptHistory,
-              sourceImageId: sourceImage.id
-            });
-
-            // Update the current image reference and its gallery ID
-            currentImage.src = imageUrl;
-            currentImage.dataset.galleryId = newEntry.id;
-            
-          } catch (error) {
-            console.error('Error saving selection fill:', error);
-            alert('Failed to save selection fill. Please try again.');
-          }
-        }
-        
-        document.getElementById('fillImagePrompt').style.display = 'none';
-        generatedImage.remove();
-      };
-
-      document.body.appendChild(generatedImage);
+        document.body.appendChild(generatedImage);
+      } catch (error) {
+        console.error('Selection fill image generation failed:', error);
+        loadingSpinner.style.display = 'none';
+        alert('Failed to generate image for selection. Please try again.');
+      }
     }
 
     function handleTextTool(clientX, clientY, canvasX, canvasY) {
@@ -1871,7 +1588,6 @@
       room = new WebsimSocket();
       await initGallery();
       setupImageEditor();
-      setupTouchHandlers(); // Add this line to set up touch handlers
     });
 
     document.getElementById('promptInput').addEventListener('keypress', function (e) {
