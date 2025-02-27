@@ -689,6 +689,17 @@
     </div>
   </div>
 
+  <div id="editTitleDialog" style="display: none;">
+    <div class="dialog-content">
+      <h3>Edit Image Title</h3>
+      <input type="text" id="editTitleInput" placeholder="Enter new title">
+      <div class="dialog-buttons">
+        <button onclick="cancelTitleEdit()">Cancel</button>
+        <button onclick="saveTitleEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let room;
     let galleryImages = [];
@@ -1081,48 +1092,110 @@
       const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
       
       try {
-        // Use the new WebSim LLM-based image generation API
-        const result = await websim.imageGen({
+        const sourceImage = galleryImages.find(img => 
+          img.imageUrl === currentImage.src
+        );
+        
+        if (sourceImage) {
+          await room.collection('gallery_images').update(sourceImage.id, {
+            uses: (sourceImage.uses || 0) + 1,
+            views: (sourceImage.views || 0) + 1
+          });
+        }
+        
+        const promptHistory = sourceImage ? 
+          [...(sourceImage.promptHistory || [{
+            prompt: sourceImage.prompt,
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
+          }])] : [];
+        
+        promptHistory.push({
           prompt: fullPrompt,
-          aspect_ratio: "1:1"
+          timestamp: new Date().toISOString(),
+          username: room.party.client.username
         });
         
-        // Create new image element with the generated image URL
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+        const imageUrl = await websim.upload(file);
+        
+        await room.collection('gallery_images').create({
+          prompt: fullPrompt,
+          title: fullPrompt,
+          imageUrl: imageUrl,
+          views: 0,
+          uses: 0,
+          modified: true,
+          promptHistory: promptHistory,
+          sourceImageId: sourceImage?.id
+        });
+        
+        alert('Image added to gallery successfully!');
+        
+      } catch (error) {
+        console.error('Error adding to gallery:', error);
+        alert('Failed to add image to gallery. Please try again.');
+      }
+    }
+
+    async function generateImage() {
+      const prefixSelect = document.getElementById('prefixPrompt');
+      const promptInput = document.getElementById('promptInput');
+      const suffixSelect = document.getElementById('suffixPrompt');
+      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+
+      if (!promptInput.value.trim()) {
+        alert('Please enter a prompt!');
+        return;
+      }
+
+      const imageContainer = document.getElementById('imageContainer');
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const placeholderText = document.getElementById('placeholderText');
+      const saveButton = document.getElementById('saveButton');
+      const editorControls = document.getElementById('editorControls');
+      const addGalleryButton = document.getElementById('addGalleryButton');
+
+      loadingSpinner.style.display = 'block';
+      placeholderText.style.display = 'none';
+      saveButton.style.display = 'none';
+      addGalleryButton.style.display = 'none';
+
+      const existingImages = imageContainer.querySelectorAll('img');
+      existingImages.forEach(img => img.remove());
+
+      try {
+        // Use the new LLM image generation
+        const result = await websim.imageGen({
+          prompt: fullPrompt,
+          aspect_ratio: "1:1", // Using default square ratio
+        });
+
         const generatedImage = document.createElement('img');
         generatedImage.id = `generatedImage_${Date.now()}`;
         generatedImage.className = 'generated-image';
         generatedImage.style.display = 'none';
         generatedImage.crossOrigin = 'anonymous';
+        generatedImage.dataset.freshGeneration = 'true';
         generatedImage.src = result.url;
         generatedImage.alt = fullPrompt;
-        
-        // Set a flag to track if this is a fresh generation
-        generatedImage.dataset.freshGeneration = 'true';
-        
+
         generatedImage.onload = async function() {
-          // Check if this is a fresh generation and hasn't been processed yet
           if (generatedImage.dataset.freshGeneration === 'true') {
-            // Immediately mark as processed to prevent duplicate processing
             generatedImage.dataset.freshGeneration = 'false';
             
-            const imageContainer = document.getElementById('imageContainer');
-            const loadingSpinner = document.getElementById('loadingSpinner');
-            const placeholderText = document.getElementById('placeholderText');
-            const saveButton = document.getElementById('saveButton');
-            const addGalleryButton = document.getElementById('addGalleryButton');
-            const editorControls = document.getElementById('editorControls');
-            
             loadingSpinner.style.display = 'none';
+            generatedImage.style.display = 'block';
             placeholderText.style.display = 'none';
             saveButton.style.display = 'block';
             addGalleryButton.style.display = 'block';
             currentImage = generatedImage;
             
             try {
-              // Create new gallery entry for the generated image
               const galleryEntry = await room.collection('gallery_images').create({
                 prompt: fullPrompt,
-                imageUrl: result.url, 
+                imageUrl: result.url,
                 views: 0,
                 uses: 0,
                 promptHistory: [{
@@ -1132,9 +1205,7 @@
                 }]
               });
               
-              // Store the gallery entry ID on the image element
               generatedImage.dataset.galleryId = galleryEntry.id;
-              
               setupImageEditor();
               
             } catch (error) {
@@ -1144,114 +1215,13 @@
           }
         };
 
-        const imageContainer = document.getElementById('imageContainer');
         imageContainer.appendChild(generatedImage);
+
       } catch (error) {
-        console.error('Image generation failed:', error);
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const placeholderText = document.getElementById('placeholderText');
+        console.error('Error generating image:', error);
         loadingSpinner.style.display = 'none';
         placeholderText.style.display = 'block';
         alert('Failed to generate image. Please try again.');
-      }
-    }
-
-    async function generateImage() {
-      const promptInput = document.getElementById('promptInput');
-      const prefixSelect = document.getElementById('prefixPrompt');
-      const suffixSelect = document.getElementById('suffixPrompt');
-      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
-      
-      if (!promptInput.value.trim()) {
-        alert('Please enter a prompt');
-        return;
-      }
-      
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      loadingSpinner.style.display = 'block';
-      placeholderText.style.display = 'none';
-      
-      try {
-        // Use the WebSim LLM-based image generation API
-        const result = await websim.imageGen({
-          prompt: fullPrompt,
-          aspect_ratio: "1:1"
-        });
-        
-        const imageContainer = document.getElementById('imageContainer');
-        const existingImages = imageContainer.querySelectorAll('img');
-        existingImages.forEach(img => img.remove());
-        
-        // Create new image element with the generated image URL
-        const generatedImage = document.createElement('img');
-        generatedImage.id = `generatedImage_${Date.now()}`;
-        generatedImage.className = 'generated-image';
-        generatedImage.style.display = 'none';
-        generatedImage.crossOrigin = 'anonymous';
-        generatedImage.src = result.url;
-        generatedImage.alt = fullPrompt;
-        
-        imageContainer.appendChild(generatedImage);
-        currentImage = generatedImage;
-        
-        document.getElementById('saveButton').style.display = 'block';
-        document.getElementById('addGalleryButton').style.display = 'block';
-        
-        currentImage.onload = function () {
-          loadingSpinner.style.display = 'none';
-          setupImageEditor();
-        };
-      } catch (error) {
-        console.error('Image generation failed:', error);
-        loadingSpinner.style.display = 'none';
-        placeholderText.style.display = 'block';
-        alert('Failed to generate image. Please try again.');
-      }
-    }
-
-    async function handleImageUpload(event) {
-      if (!event.target.files || event.target.files.length === 0) {
-        return;
-      }
-      
-      const file = event.target.files[0];
-      const loadingSpinner = document.getElementById('loadingSpinner');
-      const placeholderText = document.getElementById('placeholderText');
-      
-      loadingSpinner.style.display = 'block';
-      placeholderText.style.display = 'none';
-      
-      try {
-        const imageUrl = await websim.upload(file);
-        
-        const imageContainer = document.getElementById('imageContainer');
-        const existingImages = imageContainer.querySelectorAll('img');
-        existingImages.forEach(img => img.remove());
-        
-        const uploadedImage = document.createElement('img');
-        uploadedImage.id = `generatedImage_${Date.now()}`;
-        uploadedImage.className = 'generated-image';
-        uploadedImage.style.display = 'none';
-        uploadedImage.crossOrigin = 'anonymous';
-        uploadedImage.src = imageUrl;
-        uploadedImage.alt = 'Uploaded image';
-        
-        imageContainer.appendChild(uploadedImage);
-        currentImage = uploadedImage;
-        
-        document.getElementById('saveButton').style.display = 'block';
-        document.getElementById('addGalleryButton').style.display = 'block';
-        
-        currentImage.onload = function () {
-          loadingSpinner.style.display = 'none';
-          setupImageEditor();
-        };
-      } catch (error) {
-        console.error('Image upload failed:', error);
-        loadingSpinner.style.display = 'none';
-        placeholderText.style.display = 'block';
-        alert('Failed to upload image. Please try again.');
       }
     }
 
@@ -1272,12 +1242,12 @@
       loadingSpinner.style.display = 'block';
 
       try {
-        // Use the new WebSim LLM-based image generation API
+        // Use the new LLM image generation
         const result = await websim.imageGen({
           prompt: fullPrompt,
-          aspect_ratio: "1:1"
+          aspect_ratio: "1:1", // Using default square ratio
         });
-        
+
         const generatedImage = document.createElement('img');
         generatedImage.crossOrigin = 'anonymous';
         generatedImage.style.display = 'none';
@@ -1286,6 +1256,7 @@
         generatedImage.alt = fullPrompt;
 
         generatedImage.onload = async function() {
+          // Rest of the existing onload handler code...
           if (generatedImage.dataset.freshFill !== 'true') return;
           generatedImage.dataset.freshFill = 'false';
           
@@ -1410,10 +1381,11 @@
         };
 
         document.body.appendChild(generatedImage);
+
       } catch (error) {
-        console.error('Selection fill image generation failed:', error);
+        console.error('Error generating fill image:', error);
         loadingSpinner.style.display = 'none';
-        alert('Failed to generate image for selection. Please try again.');
+        alert('Failed to generate fill image. Please try again.');
       }
     }
 
@@ -1488,6 +1460,99 @@
       textPreview.style.color = color;
       textPreview.style.pointerEvents = 'none';
       textPreview.textContent = text || 'Enter text...';
+    }
+
+    async function commitText() {
+      if (!currentTextPosition || !currentImage) return;
+      
+      const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
+      const text = document.getElementById('textInput').value;
+      
+      if (!text.trim()) {
+        cancelText();
+        return;
+      }
+      
+      ctx.save();
+      
+      const fontFamily = document.getElementById('fontFamily').value;
+      const fontSize = document.getElementById('fontSize').value;
+      const color = document.getElementById('textColor').value;
+      
+      // Scale the font size based on the canvas scaling
+      const scaledFontSize = fontSize * currentTextPosition.scaleX;
+      ctx.font = `${scaledFontSize}px ${fontFamily}`;
+      ctx.fillStyle = color;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';  
+  
+      ctx.fillText(text, currentTextPosition.x, currentTextPosition.y);
+      
+      ctx.restore();
+      
+      originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // If this is a newly generated image, get its ID from the dataset
+      let sourceImage;
+      if (currentImage.dataset.galleryId) {
+        sourceImage = galleryImages.find(img => img.id === currentImage.dataset.galleryId);
+      } else {
+        // Otherwise find by URL for existing gallery images
+        sourceImage = galleryImages.find(img => img.imageUrl === currentImage.src);
+      }
+      
+      if (sourceImage) {
+        try {
+          await room.collection('gallery_images').update(sourceImage.id, {
+            uses: (sourceImage.uses || 0) + 1
+          });
+          
+          // Get the base prompt history - either from the current image or create new from source
+          const basePromptHistory = galleryImages.find(img => 
+            img.imageUrl === currentImage.src
+          )?.promptHistory || [{
+            prompt: sourceImage.prompt,
+            timestamp: sourceImage.created_at,
+            username: sourceImage.username
+          }];
+          
+          // Create a fresh copy to avoid reference issues
+          const promptHistory = [...basePromptHistory];
+          
+          promptHistory.push({
+            prompt: `Added text: "${text}" (${fontFamily}, ${fontSize}px, ${color})`,
+            timestamp: new Date().toISOString(),
+            type: 'text-edit',
+            username: room.party.client.username
+          });
+          
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+          const imageUrl = await websim.upload(file);
+          
+          const newEntry = await room.collection('gallery_images').create({
+            prompt: sourceImage.prompt,
+            title: sourceImage.title || sourceImage.prompt,
+            imageUrl: imageUrl,
+            views: 0,
+            uses: 0,
+            modified: true,
+            promptHistory: promptHistory,
+            sourceImageId: sourceImage.id
+          });
+
+          // Update the current image reference and its gallery ID
+          currentImage.src = imageUrl;
+          currentImage.dataset.galleryId = newEntry.id;
+          
+        } catch (error) {
+          console.error('Error saving text edit:', error);
+          alert('Failed to save text edit. Please try again.');
+        }
+      }
+      
+      cancelText();
     }
 
     async function cancelText() {
@@ -1672,6 +1737,12 @@
       dialog.style.display = 'none';
     }
 
+    window.addEventListener('load', async () => {
+      room = new WebsimSocket();
+      await initGallery();
+      setupImageEditor();
+    });
+
     document.getElementById('promptInput').addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         generateImage();
@@ -1690,12 +1761,6 @@
     document.getElementById('fontFamily').addEventListener('change', updateTextPreview);
     document.getElementById('fontSize').addEventListener('input', updateTextPreview);
     document.getElementById('textColor').addEventListener('input', updateTextPreview);
-
-    window.addEventListener('load', async () => {
-      room = new WebsimSocket();
-      await initGallery();
-      setupImageEditor();
-    });
   </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
