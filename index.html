@@ -689,17 +689,6 @@
     </div>
   </div>
 
-  <div id="editTitleDialog" style="display: none;">
-    <div class="dialog-content">
-      <h3>Edit Image Title</h3>
-      <input type="text" id="editTitleInput" placeholder="Enter new title">
-      <div class="dialog-buttons">
-        <button onclick="cancelTitleEdit()">Cancel</button>
-        <button onclick="saveTitleEdit()">Save</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     let room;
     let galleryImages = [];
@@ -1167,6 +1156,105 @@
       }
     }
 
+    async function generateImage() {
+      const promptInput = document.getElementById('promptInput');
+      const prefixSelect = document.getElementById('prefixPrompt');
+      const suffixSelect = document.getElementById('suffixPrompt');
+      const fullPrompt = `${prefixSelect.value}${promptInput.value.trim()}${suffixSelect.value}`;
+      
+      if (!promptInput.value.trim()) {
+        alert('Please enter a prompt');
+        return;
+      }
+      
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const placeholderText = document.getElementById('placeholderText');
+      loadingSpinner.style.display = 'block';
+      placeholderText.style.display = 'none';
+      
+      try {
+        // Use the WebSim LLM-based image generation API
+        const result = await websim.imageGen({
+          prompt: fullPrompt,
+          aspect_ratio: "1:1"
+        });
+        
+        const imageContainer = document.getElementById('imageContainer');
+        const existingImages = imageContainer.querySelectorAll('img');
+        existingImages.forEach(img => img.remove());
+        
+        // Create new image element with the generated image URL
+        const generatedImage = document.createElement('img');
+        generatedImage.id = `generatedImage_${Date.now()}`;
+        generatedImage.className = 'generated-image';
+        generatedImage.style.display = 'none';
+        generatedImage.crossOrigin = 'anonymous';
+        generatedImage.src = result.url;
+        generatedImage.alt = fullPrompt;
+        
+        imageContainer.appendChild(generatedImage);
+        currentImage = generatedImage;
+        
+        document.getElementById('saveButton').style.display = 'block';
+        document.getElementById('addGalleryButton').style.display = 'block';
+        
+        currentImage.onload = function () {
+          loadingSpinner.style.display = 'none';
+          setupImageEditor();
+        };
+      } catch (error) {
+        console.error('Image generation failed:', error);
+        loadingSpinner.style.display = 'none';
+        placeholderText.style.display = 'block';
+        alert('Failed to generate image. Please try again.');
+      }
+    }
+
+    async function handleImageUpload(event) {
+      if (!event.target.files || event.target.files.length === 0) {
+        return;
+      }
+      
+      const file = event.target.files[0];
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const placeholderText = document.getElementById('placeholderText');
+      
+      loadingSpinner.style.display = 'block';
+      placeholderText.style.display = 'none';
+      
+      try {
+        const imageUrl = await websim.upload(file);
+        
+        const imageContainer = document.getElementById('imageContainer');
+        const existingImages = imageContainer.querySelectorAll('img');
+        existingImages.forEach(img => img.remove());
+        
+        const uploadedImage = document.createElement('img');
+        uploadedImage.id = `generatedImage_${Date.now()}`;
+        uploadedImage.className = 'generated-image';
+        uploadedImage.style.display = 'none';
+        uploadedImage.crossOrigin = 'anonymous';
+        uploadedImage.src = imageUrl;
+        uploadedImage.alt = 'Uploaded image';
+        
+        imageContainer.appendChild(uploadedImage);
+        currentImage = uploadedImage;
+        
+        document.getElementById('saveButton').style.display = 'block';
+        document.getElementById('addGalleryButton').style.display = 'block';
+        
+        currentImage.onload = function () {
+          loadingSpinner.style.display = 'none';
+          setupImageEditor();
+        };
+      } catch (error) {
+        console.error('Image upload failed:', error);
+        loadingSpinner.style.display = 'none';
+        placeholderText.style.display = 'block';
+        alert('Failed to upload image. Please try again.');
+      }
+    }
+
     async function generateSelectionFill() {
       if (!currentSelection || !currentImage) return;
       
@@ -1584,12 +1672,6 @@
       dialog.style.display = 'none';
     }
 
-    window.addEventListener('load', async () => {
-      room = new WebsimSocket();
-      await initGallery();
-      setupImageEditor();
-    });
-
     document.getElementById('promptInput').addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         generateImage();
@@ -1608,6 +1690,12 @@
     document.getElementById('fontFamily').addEventListener('change', updateTextPreview);
     document.getElementById('fontSize').addEventListener('input', updateTextPreview);
     document.getElementById('textColor').addEventListener('input', updateTextPreview);
+
+    window.addEventListener('load', async () => {
+      room = new WebsimSocket();
+      await initGallery();
+      setupImageEditor();
+    });
   </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
