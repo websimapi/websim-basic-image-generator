@@ -159,60 +159,6 @@ async function handleImageModification(sourceImage, newImageUrl, modificationDet
   await updateSourceImageUses(sourceImage);
 }
 
-async function handleImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const imageContainer = document.getElementById('imageContainer');
-  const loadingSpinner = document.getElementById('loadingSpinner');
-  const placeholderText = document.getElementById('placeholderText');
-  const saveButton = document.getElementById('saveButton');
-  const addGalleryButton = document.getElementById('addGalleryButton');
-
-  // Show loading state
-  loadingSpinner.style.display = 'block';
-  placeholderText.style.display = 'none';
-  saveButton.style.display = 'none';
-  addGalleryButton.style.display = 'none';
-
-  try {
-    // Upload the file and get the URL
-    const imageUrl = await websim.upload(file);
-
-    // Clear any existing images
-    const existingImages = imageContainer.querySelectorAll('img');
-    existingImages.forEach(img => img.remove());
-
-    // Create new image element
-    const uploadedImage = document.createElement('img');
-    uploadedImage.id = `generatedImage_${Date.now()}`;
-    uploadedImage.className = 'generated-image';
-    uploadedImage.style.display = 'none';
-    uploadedImage.crossOrigin = 'anonymous';
-    uploadedImage.src = imageUrl;
-    uploadedImage.alt = file.name;
-
-    uploadedImage.onload = function() {
-      loadingSpinner.style.display = 'none';
-      uploadedImage.style.display = 'block';
-      saveButton.style.display = 'block';
-      addGalleryButton.style.display = 'block';
-      setupImageEditor();
-    };
-
-    imageContainer.appendChild(uploadedImage);
-
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    loadingSpinner.style.display = 'none';
-    placeholderText.style.display = 'block';
-    alert('Failed to upload image. Please try again.');
-  }
-
-  // Reset the file input
-  event.target.value = '';
-}
-
 // Utility functions
 function buildPromptHistory(sourceImage, newEntry) {
   const baseHistory = sourceImage.promptHistory || [{
@@ -330,7 +276,7 @@ async function loadImageIntoEditor(image) {
   existingImages.forEach(img => img.remove());
   
   const generatedImage = document.createElement('img');
-  generatedImage.id = `generatedImage_${Date.now()}`;
+  generatedImage.id = `generatedImage_${imageCounter++}`;
   generatedImage.className = 'generated-image';
   generatedImage.style.display = 'none';
   generatedImage.crossOrigin = 'anonymous';
@@ -346,6 +292,8 @@ async function loadImageIntoEditor(image) {
     setupImageEditor();
   };
 }
+
+let imageCounter = 0;
 
 function setupImageEditor() {
   // Setup image editor logic here
