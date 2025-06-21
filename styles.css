@@ -92,17 +92,67 @@ html {
   animation-delay: 0.2s;
 }
 
+/* Enhanced gallery item controls */
+.gallery-item-controls {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gallery-item:hover .gallery-item-controls {
+  opacity: 1;
+}
+
+.gallery-item-controls button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  min-width: auto;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.gallery-item-controls .edit-button {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.gallery-item-controls .delete-button {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+}
+
+.gallery-item-controls button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.gallery-item-controls button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
 /* Enhanced prompt history */
 .prompt-history {
-  background: rgba(0,0,0,0.2);
-  border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
   overflow: hidden;
-  margin: var(--spacing-md) 0;
-  border: 1px solid var(--border-color);
+  margin: 0.75rem 0;
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.85rem;
 }
 
 .prompt-history-header {
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: 0.5rem 0.75rem;
   background: rgba(255,255,255,0.05);
   cursor: pointer;
   display: flex;
@@ -110,7 +160,9 @@ html {
   align-items: center;
   user-select: none;
   transition: background-color 0.3s ease;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.8);
 }
 
 .prompt-history-header:hover {
@@ -120,16 +172,18 @@ html {
 .prompt-history-entries {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: max-height 0.3s ease;
 }
 
 .prompt-history.expanded .prompt-history-entries {
-  max-height: 600px;
+  max-height: 300px;
 }
 
 .prompt-history-entry {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.8rem;
+  line-height: 1.4;
   animation: slideIn 0.3s ease-out;
 }
 
@@ -138,20 +192,22 @@ html {
 }
 
 .prompt-history-entry .by-user {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-top: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.6);
+  margin-top: 0.25rem;
 }
 
 .prompt-history-entry .timestamp {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: var(--spacing-xs);
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 0.25rem;
 }
 
 .expand-icon {
+  width: 10px;
+  height: 10px;
   transform: rotate(0deg);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s ease;
 }
 
 .prompt-history.expanded .expand-icon {
@@ -172,13 +228,21 @@ html {
   text-decoration: underline;
 }
 
-/* Enhanced edit title functionality */
+/* Enhanced image title with edit functionality */
 .image-title {
-  position: relative;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
   transition: background-color 0.2s ease;
-  padding: var(--spacing-xs);
-  border-radius: var(--radius-sm);
+  position: relative;
 }
 
 .image-title:hover {
@@ -187,13 +251,14 @@ html {
 
 .edit-icon {
   opacity: 0;
-  margin-left: var(--spacing-xs);
-  font-size: 0.9rem;
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
   transition: opacity 0.2s ease;
+  color: rgba(255,255,255,0.6);
 }
 
 .image-title:hover .edit-icon {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 /* Dialog improvements */
@@ -204,29 +269,40 @@ html {
   transform: translate(-50%, -50%);
   background: rgba(0,0,0,0.95);
   backdrop-filter: blur(20px);
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-color-hover);
-  box-shadow: var(--shadow-xl);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   z-index: 1000;
-  min-width: 400px;
+  min-width: 350px;
+  max-width: 500px;
 }
 
 .dialog-content h3 {
-  margin-bottom: var(--spacing-lg);
-  color: var(--text-primary);
-  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.dialog-content input {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  font-size: 0.9rem;
 }
 
 .dialog-buttons {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 0.75rem;
   justify-content: flex-end;
   margin-top: var(--spacing-lg);
 }
 
 .dialog-buttons button {
   min-width: 80px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.85rem;
 }
 
 /* No results message */
