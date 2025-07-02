@@ -97,6 +97,10 @@ window.addEventListener('load', async () => {
   setupEventListeners();
   nsfwDetector = new SimpleNSFWDetector();
   setupFilterControls();
+  
+  // Expose to window for gallery filtering
+  window.nsfwDetector = nsfwDetector;
+  window.shouldFilter = shouldFilter;
 });
 
 // Setup filter controls

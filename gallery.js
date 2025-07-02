@@ -363,16 +363,22 @@ async function applyGalleryContentFilter(element, imageUrl) {
       element.style.filter = 'blur(20px)';
       element.style.position = 'relative';
       
-      const filterStatus = document.createElement('div');
-      filterStatus.className = 'filter-status';
-      filterStatus.textContent = `🛡️ Filtered (${analysis.riskScore}%)`;
-      element.appendChild(filterStatus);
-      
-      element.addEventListener('click', (e) => {
-        e.stopPropagation();
-        element.style.filter = 'none';
-        filterStatus.remove();
-      }, { once: true });
+      // Create overlay container if it doesn't exist
+      if (!element.querySelector('.filter-status')) {
+        const filterStatus = document.createElement('div');
+        filterStatus.className = 'filter-status';
+        filterStatus.textContent = `🛡️ Filtered (${analysis.riskScore}%)`;
+        element.appendChild(filterStatus);
+        
+        // Add click handler to reveal image
+        element.addEventListener('click', (e) => {
+          if (e.target === element || e.target === filterStatus) {
+            e.stopPropagation();
+            element.style.filter = 'none';
+            filterStatus.remove();
+          }
+        }, { once: true });
+      }
     }
   } catch (error) {
     console.error('Error applying gallery content filter:', error);
