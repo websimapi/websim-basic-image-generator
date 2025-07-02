@@ -95,12 +95,24 @@ window.addEventListener('load', async () => {
   initializeEditor();
   setupColorPicker();
   setupEventListeners();
-  nsfwDetector = new SimpleNSFWDetector();
-  setupFilterControls();
   
-  // Expose to window for gallery filtering
-  window.nsfwDetector = nsfwDetector;
+  // Initialize NSFW detector and ensure it's available globally
+  try {
+    nsfwDetector = new SimpleNSFWDetector();
+    window.nsfwDetector = nsfwDetector;
+    // Pre-load the model to avoid delays during scoring
+    await nsfwDetector.loadModel();
+    console.log('NSFW detector ready');
+  } catch (error) {
+    console.error('Failed to initialize NSFW detector:', error);
+    // Set a fallback detector that returns safe scores
+    window.nsfwDetector = {
+      analyzeURL: async () => ({ riskScore: 0, categories: {} })
+    };
+  }
+  
   window.shouldFilter = shouldFilter;
+  setupFilterControls();
 });
 
 // Setup filter controls

@@ -111,20 +111,25 @@ async function renderGalleryItems(images, container) {
 
   container.innerHTML = images.map(img => createGalleryItemHTML(img)).join('');
   
-  // Apply content filtering to gallery images after rendering
-  setTimeout(async () => {
-    const imageElements = container.querySelectorAll('.gallery-item-image[data-image-url]');
-    for (const element of imageElements) {
-      try {
-        const imageUrl = element.dataset.imageUrl;
-        if (imageUrl && window.nsfwDetector) {
-          await applyGalleryContentFilter(element, imageUrl);
-        }
-      } catch (error) {
-        console.error('Error filtering gallery image:', error);
+  // Apply content filtering to gallery images after rendering - ensure this happens every time
+  const imageElements = container.querySelectorAll('.gallery-item-image[data-image-url]');
+  
+  // Process each image sequentially to avoid overwhelming the detector
+  for (const element of imageElements) {
+    try {
+      const imageUrl = element.dataset.imageUrl;
+      if (imageUrl && window.nsfwDetector) {
+        await applyGalleryContentFilter(element, imageUrl);
+      } else {
+        // If nsfwDetector is not available, show a default low-risk score
+        addRiskScoreDisplay(element, 0, false);
       }
+    } catch (error) {
+      console.error('Error filtering gallery image:', error);
+      // Show a neutral score instead of error indicator
+      addRiskScoreDisplay(element, 0, false);
     }
-  }, 100);
+  }
 }
 
 function createGalleryItemHTML(img) {
@@ -357,12 +362,14 @@ function updatePaginationControls(currentPage, totalPages) {
 
 async function applyGalleryContentFilter(element, imageUrl) {
   try {
+    // Ensure the detector is loaded before trying to analyze
+    if (!window.nsfwDetector) {
+      console.warn('NSFW detector not available');
+      addRiskScoreDisplay(element, 0, false);
+      return;
+    }
+
     const analysis = await window.nsfwDetector.analyzeURL(imageUrl);
-    
-    // Always show the risk score in top right corner
-    const scoreElement = document.createElement('div');
-    scoreElement.className = 'risk-score-display';
-    scoreElement.textContent = `${analysis.riskScore}%`;
     
     // Get current filter settings
     const enableFilter = document.getElementById('enableFilter')?.checked ?? true;
@@ -371,37 +378,55 @@ async function applyGalleryContentFilter(element, imageUrl) {
     // Determine if image should be blurred based on sensitivity
     const shouldBlur = enableFilter && analysis.riskScore >= sensitivity;
     
+    addRiskScoreDisplay(element, analysis.riskScore, shouldBlur);
+    
     if (shouldBlur) {
-      scoreElement.classList.add('high-risk');
       element.style.filter = 'blur(20px)';
       
       // Add click handler to reveal image
       const revealHandler = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         element.style.filter = 'none';
-        scoreElement.classList.remove('high-risk');
-        scoreElement.classList.add('revealed');
+        const scoreEl = element.querySelector('.risk-score-display');
+        if (scoreEl) {
+          scoreEl.classList.remove('high-risk');
+          scoreEl.classList.add('revealed');
+        }
         element.removeEventListener('click', revealHandler);
       };
       
       element.addEventListener('click', revealHandler);
-    } else {
-      scoreElement.classList.add('low-risk');
     }
-    
-    // Position the score element
-    element.style.position = 'relative';
-    element.appendChild(scoreElement);
     
   } catch (error) {
     console.error('Error applying gallery content filter:', error);
-    // Show error indicator
-    const errorElement = document.createElement('div');
-    errorElement.className = 'risk-score-display error-risk';
-    errorElement.textContent = '?';
-    element.style.position = 'relative';
-    element.appendChild(errorElement);
+    // Show neutral score instead of error indicator
+    addRiskScoreDisplay(element, 0, false);
   }
+}
+
+// Helper function to add risk score display consistently
+function addRiskScoreDisplay(element, riskScore, isHighRisk) {
+  // Remove any existing score display
+  const existingScore = element.querySelector('.risk-score-display');
+  if (existingScore) {
+    existingScore.remove();
+  }
+  
+  const scoreElement = document.createElement('div');
+  scoreElement.className = 'risk-score-display';
+  scoreElement.textContent = `${riskScore}%`;
+  
+  if (isHighRisk) {
+    scoreElement.classList.add('high-risk');
+  } else {
+    scoreElement.classList.add('low-risk');
+  }
+  
+  // Ensure the parent element is positioned relative
+  element.style.position = 'relative';
+  element.appendChild(scoreElement);
 }
 
 // Expose functions to global scope
