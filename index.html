@@ -10,6 +10,8 @@
       }
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+  <script src="https://api.websim.com/blobs/0197cc2d-1c44-73ff-86ab-2c58b5d8657d"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -43,6 +45,29 @@
         <button onclick="document.getElementById('imageUpload').click()">📁 Upload</button>
         <input type="file" id="referenceImageUpload" accept="image/*" onchange="handleReferenceImageUpload(event)" style="display:none">
         <button onclick="document.getElementById('referenceImageUpload').click()">🖼️ Ref</button>
+        <button onclick="toggleFilterSettings()" class="filter-settings-button" title="Content Filter Settings">🛡️</button>
+      </div>
+      
+      <div id="filterSettings" class="filter-settings" style="display: none;">
+        <div class="filter-settings-content">
+          <h3>Content Filter Settings</h3>
+          <div class="filter-controls">
+            <label class="filter-toggle">
+              <input type="checkbox" id="enableFilter" checked>
+              <span>Enable Content Filter</span>
+            </label>
+            <div class="sensitivity-control">
+              <label>Sensitivity Level:</label>
+              <input type="range" id="filterSensitivity" min="10" max="90" value="50" step="10">
+              <span id="sensitivityValue">50</span>
+            </div>
+            <div class="filter-categories">
+              <label><input type="checkbox" id="filterPorn" checked> Block Explicit Content</label>
+              <label><input type="checkbox" id="filterSexy" checked> Block Suggestive Content</label>
+              <label><input type="checkbox" id="filterHentai" checked> Block Animated Adult Content</label>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="referenceImageContainer" style="display: none; margin-bottom: 1rem;">

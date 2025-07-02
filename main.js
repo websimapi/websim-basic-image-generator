@@ -7,6 +7,87 @@ let room;
 let currentImage = null;
 let referenceImageDescription = null;
 
+// NSFW Detection Class
+class SimpleNSFWDetector {
+    constructor() {
+        this.model = null;
+        this.isLoading = false;
+    }
+
+    async loadModel() {
+        if (this.model) return this.model;
+        if (this.isLoading) {
+            while (this.isLoading) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return this.model;
+        }
+
+        try {
+            this.isLoading = true;
+            console.log('Loading NSFW detection model...');
+            // Assumes nsfwjs is loaded on the window
+            this.model = await window.nsfwjs.load();
+            console.log('NSFW model loaded successfully');
+            return this.model;
+        } catch (error) {
+            console.error('Failed to load NSFW model:', error);
+            throw error;
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    async analyzeImage(imageElement) {
+        try {
+            const model = await this.loadModel();
+            const predictions = await model.classify(imageElement);
+            
+            const nsfwScore = predictions.find(p => p.className === 'Porn')?.probability || 0;
+            const sexyScore = predictions.find(p => p.className === 'Sexy')?.probability || 0;
+            const hentaiScore = predictions.find(p => p.className === 'Hentai')?.probability || 0;
+            
+            const riskScore = Math.round((nsfwScore + sexyScore * 0.7 + hentaiScore) * 100);
+            
+            return {
+                riskScore,
+                isNSFW: riskScore > 50,
+                predictions,
+                categories: {
+                    porn: Math.round(nsfwScore * 100),
+                    sexy: Math.round(sexyScore * 100),
+                    hentai: Math.round(hentaiScore * 100),
+                    neutral: Math.round((predictions.find(p => p.className === 'Neutral')?.probability || 0) * 100),
+                    drawing: Math.round((predictions.find(p => p.className === 'Drawing')?.probability || 0) * 100)
+                }
+            };
+        } catch (error) {
+            console.error('Error analyzing image:', error);
+            throw error;
+        }
+    }
+
+    async analyzeURL(imageUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = async () => {
+                try {
+                    const result = await this.analyzeImage(img);
+                    resolve({ ...result, imgSrc: imageUrl });
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            img.onerror = () => reject(new Error('Failed to load image from URL. Check CORS policy.'));
+            img.src = imageUrl;
+        });
+    }
+}
+
+// Initialize NSFW detector
+let nsfwDetector = null;
+
 // Initialize the application
 window.addEventListener('load', async () => {
   room = new WebsimSocket();
@@ -14,7 +95,95 @@ window.addEventListener('load', async () => {
   initializeEditor();
   setupColorPicker();
   setupEventListeners();
+  nsfwDetector = new SimpleNSFWDetector();
+  setupFilterControls();
 });
+
+// Setup filter controls
+function setupFilterControls() {
+  const sensitivitySlider = document.getElementById('filterSensitivity');
+  const sensitivityValue = document.getElementById('sensitivityValue');
+  
+  sensitivitySlider.addEventListener('input', (e) => {
+    sensitivityValue.textContent = e.target.value;
+  });
+}
+
+// Filter settings toggle
+function toggleFilterSettings() {
+  const filterSettings = document.getElementById('filterSettings');
+  filterSettings.style.display = filterSettings.style.display === 'none' ? 'block' : 'none';
+}
+
+// Check if content should be filtered
+function shouldFilter(analysis) {
+  const enableFilter = document.getElementById('enableFilter').checked;
+  if (!enableFilter) return false;
+  
+  const sensitivity = parseInt(document.getElementById('filterSensitivity').value);
+  const filterPorn = document.getElementById('filterPorn').checked;
+  const filterSexy = document.getElementById('filterSexy').checked;
+  const filterHentai = document.getElementById('filterHentai').checked;
+  
+  if (filterPorn && analysis.categories.porn >= sensitivity) return true;
+  if (filterSexy && analysis.categories.sexy >= sensitivity) return true;  
+  if (filterHentai && analysis.categories.hentai >= sensitivity) return true;
+  
+  return false;
+}
+
+// Apply content filter to image
+async function applyContentFilter(imageElement, imageUrl) {
+  try {
+    const analysis = await nsfwDetector.analyzeURL(imageUrl);
+    
+    if (shouldFilter(analysis)) {
+      const container = imageElement.parentElement;
+      if (container && !container.querySelector('.censored-overlay')) {
+        createCensoredOverlay(container, imageElement, analysis);
+      }
+    }
+  } catch (error) {
+    console.error('Error applying content filter:', error);
+  }
+}
+
+// Create censored overlay
+function createCensoredOverlay(container, imageElement, analysis) {
+  container.classList.add('censored-image-container');
+  imageElement.classList.add('blurred-image');
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'censored-overlay';
+  overlay.innerHTML = `
+    <div class="censored-content">
+      <div class="censored-icon">🛡️</div>
+      <div class="censored-title">Content Filtered</div>
+      <div class="censored-subtitle">This image was flagged by the content filter</div>
+      <div class="risk-score">Risk Score: ${analysis.riskScore}%</div>
+      <button class="reveal-button" onclick="revealCensoredImage(this)">
+        👁️ Click to Reveal
+      </button>
+    </div>
+  `;
+  
+  container.appendChild(overlay);
+}
+
+// Reveal censored image
+function revealCensoredImage(button) {
+  const overlay = button.closest('.censored-overlay');
+  const container = overlay.parentElement;
+  const image = container.querySelector('img');
+  
+  overlay.style.opacity = '0';
+  image.classList.remove('blurred-image');
+  
+  setTimeout(() => {
+    overlay.remove();
+    container.classList.remove('censored-image-container');
+  }, 300);
+}
 
 // Setup event listeners
 function setupEventListeners() {
@@ -159,6 +328,9 @@ async function handleImageGenerated(generatedImage, fullPrompt, imageUrl) {
     
     generatedImage.dataset.galleryId = galleryEntry.id;
     setupImageEditor(generatedImage);
+    
+    // Apply content filter to generated image
+    await applyContentFilter(generatedImage, imageUrl);
     
   } catch (error) {
     console.error('Error processing generated image:', error);
@@ -423,6 +595,8 @@ window.showGalleryTab = showGalleryTab;
 window.changePage = changePage;
 window.filterGallery = filterGallery;
 window.clearUserFilter = clearUserFilter;
+window.toggleFilterSettings = toggleFilterSettings;
+window.revealCensoredImage = revealCensoredImage;
 
 // Export for other modules
 export { room, currentImage };

@@ -99,7 +99,7 @@ function updateUserFilterUI(show) {
   }
 }
 
-function renderGalleryItems(images, container) {
+async function renderGalleryItems(images, container) {
   if (images.length === 0) {
     container.innerHTML = `
       <div class="no-results">
@@ -110,6 +110,21 @@ function renderGalleryItems(images, container) {
   }
 
   container.innerHTML = images.map(img => createGalleryItemHTML(img)).join('');
+  
+  // Apply content filtering to gallery images after rendering
+  setTimeout(async () => {
+    const imageElements = container.querySelectorAll('.gallery-item-image[data-image-url]');
+    for (const element of imageElements) {
+      try {
+        const imageUrl = element.dataset.imageUrl;
+        if (imageUrl && window.nsfwDetector) {
+          await applyGalleryContentFilter(element, imageUrl);
+        }
+      } catch (error) {
+        console.error('Error filtering gallery image:', error);
+      }
+    }
+  }, 100);
 }
 
 function createGalleryItemHTML(img) {
@@ -121,6 +136,7 @@ function createGalleryItemHTML(img) {
         onclick="loadGalleryImage('${img.id}')"
         role="img" 
         aria-label="${img.prompt}"
+        data-image-url="${img.imageUrl}"
       ></div>
       <div class="metadata">
         <div class="image-title" ${img.username === room.party.client.username ? 'onclick="editTitle(\'' + img.id + '\')"' : ''}>
@@ -339,6 +355,30 @@ function updatePaginationControls(currentPage, totalPages) {
   document.getElementById('nextPage').disabled = currentPage >= totalPages;
 }
 
+async function applyGalleryContentFilter(element, imageUrl) {
+  try {
+    const analysis = await window.nsfwDetector.analyzeURL(imageUrl);
+    
+    if (window.shouldFilter && window.shouldFilter(analysis)) {
+      element.style.filter = 'blur(20px)';
+      element.style.position = 'relative';
+      
+      const filterStatus = document.createElement('div');
+      filterStatus.className = 'filter-status';
+      filterStatus.textContent = `🛡️ Filtered (${analysis.riskScore}%)`;
+      element.appendChild(filterStatus);
+      
+      element.addEventListener('click', (e) => {
+        e.stopPropagation();
+        element.style.filter = 'none';
+        filterStatus.remove();
+      }, { once: true });
+    }
+  } catch (error) {
+    console.error('Error applying gallery content filter:', error);
+  }
+}
+
 // Expose functions to global scope
 window.loadGalleryImage = loadGalleryImage;
 window.showUserGallery = showUserGallery;
@@ -347,6 +387,7 @@ window.editTitle = editTitle;
 window.saveTitleEdit = saveTitleEdit;
 window.cancelTitleEdit = cancelTitleEdit;
 window.deleteImage = deleteImage;
+window.applyGalleryContentFilter = applyGalleryContentFilter;
 
 export {
   initGallery,

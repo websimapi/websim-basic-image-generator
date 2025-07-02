@@ -619,6 +619,183 @@ canvas.magic-wand {
   background: #d32f2f;
 }
 
+/* Filter settings */
+.filter-settings-button {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  min-width: 60px;
+}
+
+.filter-settings {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+.filter-settings-content h3 {
+  margin-bottom: 1rem;
+  color: #ff9800;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.filter-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-toggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.sensitivity-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sensitivity-control input[type="range"] {
+  flex: 1;
+  min-width: 150px;
+}
+
+.sensitivity-control span {
+  color: #ff9800;
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.filter-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-categories label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.filter-categories input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Censored image styles */
+.censored-image-container {
+  position: relative;
+  display: inline-block;
+}
+
+.censored-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.censored-overlay:hover {
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(15px);
+}
+
+.censored-content {
+  text-align: center;
+  color: white;
+  padding: 1rem;
+}
+
+.censored-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+}
+
+.censored-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.censored-subtitle {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-bottom: 1rem;
+}
+
+.risk-score {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.reveal-button {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reveal-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+}
+
+.blurred-image {
+  filter: blur(20px);
+  transition: filter 0.3s ease;
+}
+
+.filter-status {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  background: rgba(255, 152, 0, 0.9);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  z-index: 5;
+}
+
 /* Enhanced focus styles for accessibility */
 *:focus-visible {
   outline: 2px solid #4CAF50;
@@ -817,39 +994,6 @@ html {
 .username-link:hover {
   color: #1976D2;
   text-decoration: underline;
-}
-
-/* Enhanced image title with edit functionality */
-.image-title {
-  font-weight: 600;
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
-  position: relative;
-}
-
-.image-title:hover {
-  background: rgba(255,255,255,0.05);
-}
-
-.edit-icon {
-  opacity: 0;
-  margin-left: 0.25rem;
-  font-size: 0.75rem;
-  transition: opacity 0.2s ease;
-  color: rgba(255,255,255,0.6);
-}
-
-.image-title:hover .edit-icon {
-  opacity: 1;
 }
 
 /* Dialog improvements */
