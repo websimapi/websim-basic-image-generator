@@ -753,111 +753,43 @@ canvas.magic-wand {
   margin-bottom: 1rem;
 }
 
-.risk-score {
-  background: linear-gradient(135deg, #f44336, #d32f2f);
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-.reveal-button {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  border: none;
-  padding: 0.6rem 1.25rem;
-  border-radius: 8px;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.reveal-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
-}
-
-.blurred-image {
-  filter: blur(20px);
-  transition: filter 0.3s ease;
-}
-
-.filter-status {
+/* Risk score display for gallery images */
+.risk-score-display {
   position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  background: rgba(255, 152, 0, 0.9);
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  z-index: 5;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  transition: all 0.3s ease;
 }
 
-/* Enhanced focus styles for accessibility */
-*:focus-visible {
-  outline: 2px solid #4CAF50;
-  outline-offset: 2px;
+.risk-score-display.low-risk {
+  background: rgba(76, 175, 80, 0.8);
+  border-color: rgba(76, 175, 80, 0.4);
 }
 
-button:focus,
-input:focus,
-select:focus {
-  outline: 2px solid #4CAF50;
-  outline-offset: 2px;
+.risk-score-display.high-risk {
+  background: rgba(244, 67, 54, 0.8);
+  border-color: rgba(244, 67, 54, 0.4);
+  animation: pulse 2s infinite;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+.risk-score-display.revealed {
+  background: rgba(255, 152, 0, 0.8);
+  border-color: rgba(255, 152, 0, 0.4);
 }
 
-/* Enhanced animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-/* Enhanced gallery items */
-.gallery-item {
-  animation: fadeIn 0.5s ease-out;
-}
-
-.gallery-item:nth-child(odd) {
-  animation-delay: 0.1s;
-}
-
-.gallery-item:nth-child(even) {
-  animation-delay: 0.2s;
+.risk-score-display.error-risk {
+  background: rgba(158, 158, 158, 0.8);
+  border-color: rgba(158, 158, 158, 0.4);
 }
 
 /* Enhanced gallery item controls */

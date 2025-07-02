@@ -359,29 +359,48 @@ async function applyGalleryContentFilter(element, imageUrl) {
   try {
     const analysis = await window.nsfwDetector.analyzeURL(imageUrl);
     
-    if (window.shouldFilter && window.shouldFilter(analysis)) {
+    // Always show the risk score in top right corner
+    const scoreElement = document.createElement('div');
+    scoreElement.className = 'risk-score-display';
+    scoreElement.textContent = `${analysis.riskScore}%`;
+    
+    // Get current filter settings
+    const enableFilter = document.getElementById('enableFilter')?.checked ?? true;
+    const sensitivity = parseInt(document.getElementById('filterSensitivity')?.value ?? 50);
+    
+    // Determine if image should be blurred based on sensitivity
+    const shouldBlur = enableFilter && analysis.riskScore >= sensitivity;
+    
+    if (shouldBlur) {
+      scoreElement.classList.add('high-risk');
       element.style.filter = 'blur(20px)';
-      element.style.position = 'relative';
       
-      // Create overlay container if it doesn't exist
-      if (!element.querySelector('.filter-status')) {
-        const filterStatus = document.createElement('div');
-        filterStatus.className = 'filter-status';
-        filterStatus.textContent = `🛡️ Filtered (${analysis.riskScore}%)`;
-        element.appendChild(filterStatus);
-        
-        // Add click handler to reveal image
-        element.addEventListener('click', (e) => {
-          if (e.target === element || e.target === filterStatus) {
-            e.stopPropagation();
-            element.style.filter = 'none';
-            filterStatus.remove();
-          }
-        }, { once: true });
-      }
+      // Add click handler to reveal image
+      const revealHandler = (e) => {
+        e.stopPropagation();
+        element.style.filter = 'none';
+        scoreElement.classList.remove('high-risk');
+        scoreElement.classList.add('revealed');
+        element.removeEventListener('click', revealHandler);
+      };
+      
+      element.addEventListener('click', revealHandler);
+    } else {
+      scoreElement.classList.add('low-risk');
     }
+    
+    // Position the score element
+    element.style.position = 'relative';
+    element.appendChild(scoreElement);
+    
   } catch (error) {
     console.error('Error applying gallery content filter:', error);
+    // Show error indicator
+    const errorElement = document.createElement('div');
+    errorElement.className = 'risk-score-display error-risk';
+    errorElement.textContent = '?';
+    element.style.position = 'relative';
+    element.appendChild(errorElement);
   }
 }
 
